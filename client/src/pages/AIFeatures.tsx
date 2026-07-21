@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -15,6 +15,19 @@ export default function AIFeatures() {
   const [loadingReport, setLoadingReport] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [loadingIdeas, setLoadingIdeas] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+
+  const createScriptMutation = trpc.scripts.create.useMutation({
+    onSuccess: () => {
+      setSavingDraft(false);
+      toast.success("脚本已保存为草稿！");
+      setTopicIdeas(null);
+    },
+    onError: () => {
+      setSavingDraft(false);
+      toast.error("保存失败，请重试");
+    },
+  });
 
   const generateWeeklyReportMutation = trpc.ai.generateWeeklyReport.useMutation({
     onSuccess: (data) => {
@@ -76,6 +89,24 @@ export default function AIFeatures() {
   const handleGenerateTopicIdeas = () => {
     setLoadingIdeas(true);
     generateTopicIdeasMutation.mutate({});
+  };
+
+  const handleSaveAsDraft = () => {
+    if (!topicIdeas) return;
+    setSavingDraft(true);
+    
+    // 从脑暴内容中提取标题（第一行）
+    const lines = topicIdeas.split('\n').filter(l => l.trim());
+    const title = lines[0]?.replace(/^#+\s*/, '').substring(0, 100) || '脑暴选题';
+    
+    createScriptMutation.mutate({
+      title,
+      content: topicIdeas,
+      topicTag: '其他' as const,
+      hookType: '其他' as const,
+      accountId: '',
+      status: '草稿' as const,
+    });
   };
 
   return (
@@ -208,10 +239,30 @@ export default function AIFeatures() {
                 </Button>
 
                 {topicIdeas && (
-                  <div className="mt-6 p-4 bg-muted rounded-lg border">
-                    <div className="prose prose-sm max-w-none dark:prose-invert">
-                      <Streamdown>{topicIdeas}</Streamdown>
+                  <div className="mt-6 space-y-4">
+                    <div className="p-4 bg-muted rounded-lg border">
+                      <div className="prose prose-sm max-w-none dark:prose-invert">
+                        <Streamdown>{topicIdeas}</Streamdown>
+                      </div>
                     </div>
+                    <Button
+                      onClick={handleSaveAsDraft}
+                      disabled={savingDraft}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      {savingDraft ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          保存中...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          一键存为草稿脚本
+                        </>
+                      )}
+                    </Button>
                   </div>
                 )}
               </CardContent>
