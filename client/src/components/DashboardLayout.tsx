@@ -139,11 +139,11 @@ function DashboardLayoutContent({
         <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-semibold text-xs">达</span>
+              <span className="text-primary-foreground font-semibold text-xs">M</span>
             </div>
             <div className="flex flex-col">
               <span className="font-semibold text-sm leading-tight tracking-tight">达人孵化工作台</span>
-              <span className="text-[10px] text-muted-foreground leading-tight">Talent Incubation</span>
+              <span className="text-[10px] text-muted-foreground leading-tight">MLSX Creator Hub</span>
             </div>
           </div>
         </SidebarHeader>
