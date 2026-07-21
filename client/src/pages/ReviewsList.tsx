@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader, Tag } from "@/components/Meta";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -73,13 +73,11 @@ export default function ReviewsList() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">复盘库</h1>
-          <p className="text-gray-600 mt-2">按周沉淀工作总结，形成系统的知识积累</p>
-        </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="复盘库"
+        description="按周沉淀工作总结，形成系统的知识积累"
+        actions={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
@@ -211,14 +209,17 @@ export default function ReviewsList() {
                   )}
                 />
 
-                <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "创建中..." : "创建复盘"}
-                </Button>
+                <div className="flex justify-end pt-2">
+                  <Button type="submit" disabled={createMutation.isPending}>
+                    {createMutation.isPending ? "创建中…" : "创建复盘"}
+                  </Button>
+                </div>
               </form>
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
+        }
+      />
 
       {/* Reviews List */}
       {isLoading ? (
@@ -226,45 +227,41 @@ export default function ReviewsList() {
           <Spinner />
         </div>
       ) : reviews && reviews.length > 0 ? (
-        <div className="space-y-3">
-          {reviews.map((review) => (
-            <Card
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          {reviews.map((review, idx) => (
+            <div
               key={review.id}
-              className="cursor-pointer hover:shadow-md transition-shadow"
+              className={`cursor-pointer px-5 py-4 hover:bg-accent/60 transition-colors duration-150 group ${
+                idx > 0 ? "border-t border-border" : ""
+              }`}
               onClick={() => setSelectedReview(review.id)}
             >
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-lg">{review.week}</h3>
-                      {review.aiGenerated && (
-                        <Badge variant="secondary" className="text-xs">AI 生成</Badge>
-                      )}
-                      {review.accountId && (
-                        <Badge variant="outline" className="text-xs">
-                          {accounts?.find(a => a.id === review.accountId)?.name}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 line-clamp-2">{review.content}</p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h3 className="font-data text-sm font-medium group-hover:underline underline-offset-4 decoration-border">
+                      {review.week}
+                    </h3>
+                    {review.aiGenerated && <Tag>AI 生成</Tag>}
+                    {review.accountId && (
+                      <Tag>{accounts?.find(a => a.id === review.accountId)?.name}</Tag>
+                    )}
                   </div>
-                  <div className="text-right text-sm text-gray-500 ml-4">
-                    {new Date(review.createdAt).toLocaleDateString("zh-CN")}
-                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-2">{review.content}</p>
                 </div>
-              </CardContent>
-            </Card>
+                <span className="font-data text-xs text-muted-foreground shrink-0 pt-0.5">
+                  {new Date(review.createdAt).toLocaleDateString("zh-CN")}
+                </span>
+              </div>
+            </div>
           ))}
         </div>
       ) : (
-        <Card className="text-center py-12">
-          <CardContent>
-            <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 mb-4">还没有复盘，点击"新增复盘"开始</p>
-            <Button onClick={() => setOpen(true)}>新增复盘</Button>
-          </CardContent>
-        </Card>
+        <div className="text-center py-16 border border-dashed border-border rounded-lg">
+          <BookOpen className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" strokeWidth={1.5} />
+          <p className="text-sm text-muted-foreground mb-4">还没有复盘，点击“新增复盘”开始</p>
+          <Button variant="outline" size="sm" onClick={() => setOpen(true)}>新增复盘</Button>
+        </div>
       )}
 
       {/* Review Detail Modal */}
@@ -274,29 +271,22 @@ export default function ReviewsList() {
             <DialogHeader>
               <DialogTitle>{reviewDetail.week} 复盘</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm text-gray-600">总体复盘</Label>
-                <p className="mt-2 text-gray-800 whitespace-pre-wrap">{reviewDetail.content}</p>
-              </div>
-              {reviewDetail.highlights && (
-                <div>
-                  <Label className="text-sm text-gray-600">爆款分析</Label>
-                  <p className="mt-2 text-gray-800 whitespace-pre-wrap">{reviewDetail.highlights}</p>
-                </div>
-              )}
-              {reviewDetail.pitfalls && (
-                <div>
-                  <Label className="text-sm text-gray-600">踩坑记录</Label>
-                  <p className="mt-2 text-gray-800 whitespace-pre-wrap">{reviewDetail.pitfalls}</p>
-                </div>
-              )}
-              {reviewDetail.nextWeekPlan && (
-                <div>
-                  <Label className="text-sm text-gray-600">下周计划</Label>
-                  <p className="mt-2 text-gray-800 whitespace-pre-wrap">{reviewDetail.nextWeekPlan}</p>
-                </div>
-              )}
+            <div className="space-y-5">
+              {[
+                { label: "总体复盘", value: reviewDetail.content },
+                { label: "爆款分析", value: reviewDetail.highlights },
+                { label: "踩坑记录", value: reviewDetail.pitfalls },
+                { label: "下周计划", value: reviewDetail.nextWeekPlan },
+              ]
+                .filter((s) => s.value)
+                .map((section) => (
+                  <div key={section.label}>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+                      {section.label}
+                    </p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{section.value}</p>
+                  </div>
+                ))}
             </div>
           </DialogContent>
         </Dialog>

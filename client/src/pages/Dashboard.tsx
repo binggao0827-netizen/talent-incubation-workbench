@@ -1,11 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader, StatStrip, StatusDot } from "@/components/Meta";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
-import { BarChart3, Users, TrendingUp, FileText } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   LineChart,
   Line,
@@ -15,7 +14,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 
@@ -30,78 +28,77 @@ export default function Dashboard() {
     limit: 5,
   });
 
-  // Calculate date range
-  const now = new Date();
-  const startDate = new Date();
-  if (timeRange === "week") {
-    startDate.setDate(now.getDate() - 7);
-  } else {
-    startDate.setMonth(now.getMonth() - 1);
-  }
+  // Calculate date range (memoized to keep query input references stable)
+  const { startDate, endDate } = useMemo(() => {
+    const end = new Date();
+    const start = new Date();
+    if (timeRange === "week") {
+      start.setDate(end.getDate() - 7);
+    } else {
+      start.setMonth(end.getMonth() - 1);
+    }
+    return { startDate: start, endDate: end };
+  }, [timeRange]);
 
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.getStats.useQuery({
     startDate,
-    endDate: now,
+    endDate,
   });
 
   if (!user || user.role !== "admin") {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">仅管理员可访问看板</p>
+        <p className="text-sm text-muted-foreground">仅管理员可访问看板</p>
       </div>
     );
   }
 
   const isLoading = accountsLoading || scriptsLoading || statsLoading;
 
-  // Generate mock data for charts
-  const generateChartData = () => {
-    const data = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      data.push({
-        date: date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" }),
-        views: Math.floor(Math.random() * 50000) + 10000,
-        followers: Math.floor(Math.random() * 5000) + 1000,
-      });
-    }
-    return data;
-  };
+  // 基于真实 TOP 脚本数据构建图表；无数据时为空
+  const chartData = (topScripts || []).map((item) => ({
+    name:
+      item.script.title.length > 8
+        ? item.script.title.slice(0, 8) + "…"
+        : item.script.title,
+    views: item.metric?.views || 0,
+    followers: item.metric?.newFollowers || 0,
+  }));
 
-  const chartData = generateChartData();
+  const chartTooltipStyle = {
+    borderRadius: 8,
+    border: "1px solid var(--border)",
+    background: "var(--card)",
+    boxShadow: "none",
+    fontSize: 12,
+  } as const;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">老板看板</h1>
-          <p className="text-gray-600 mt-2">实时掌握团队内容表现和数据趋势</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setTimeRange("week")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              timeRange === "week"
-                ? "bg-blue-500 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            本周
-          </button>
-          <button
-            onClick={() => setTimeRange("month")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              timeRange === "month"
-                ? "bg-blue-500 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            本月
-          </button>
-        </div>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="看板"
+        description="团队内容表现与数据趋势"
+        actions={
+          <div className="inline-flex rounded-md border border-border p-0.5 bg-muted/50">
+            {([
+              { key: "week", label: "本周" },
+              { key: "month", label: "本月" },
+            ] as const).map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setTimeRange(opt.key)}
+                className={`px-3 py-1 rounded text-sm transition-colors duration-150 ${
+                  timeRange === opt.key
+                    ? "bg-card text-foreground border border-border font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {/* KPI Cards */}
       {isLoading ? (
@@ -110,212 +107,155 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  总账号数
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{stats?.totalAccounts || 0}</div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {accounts?.filter(a => a.status === "成熟").length || 0} 个成熟账号
-                </p>
-              </CardContent>
-            </Card>
+          <StatStrip
+            items={[
+              {
+                label: "总账号数",
+                value: stats?.totalAccounts || 0,
+                hint: `${accounts?.filter((a) => a.status === "成熟").length || 0} 个成熟账号`,
+              },
+              {
+                label: "新增脚本",
+                value: stats?.newScriptsCount || 0,
+                hint: `${timeRange === "week" ? "本周" : "本月"}新增`,
+              },
+              {
+                label: "总涨粉",
+                value: stats?.totalNewFollowers || 0,
+                hint: `${timeRange === "week" ? "本周" : "本月"}涨粉数`,
+              },
+              {
+                label: "总播放量",
+                value: stats?.totalViews || 0,
+                hint: `${timeRange === "week" ? "本周" : "本月"}播放量`,
+              },
+            ]}
+          />
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  新增脚本
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{stats?.newScriptsCount || 0}</div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {timeRange === "week" ? "本周" : "本月"}新增
-                </p>
-              </CardContent>
-            </Card>
+          {/* Charts —— 基于 TOP 脚本真实数据 */}
+          {chartData.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card className="shadow-none">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">播放量对比</CardTitle>
+                  <CardDescription className="text-xs">TOP 脚本最近一次录入的播放量</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={chartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                      <CartesianGrid stroke="var(--border)" strokeDasharray="0" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={chartTooltipStyle} />
+                      <Line
+                        type="monotone"
+                        dataKey="views"
+                        stroke="var(--signal)"
+                        name="播放量"
+                        strokeWidth={1.75}
+                        dot={{ r: 2.5, fill: "var(--signal)", strokeWidth: 0 }}
+                        activeDot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  总涨粉
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  {(stats?.totalNewFollowers || 0).toLocaleString()}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {timeRange === "week" ? "本周" : "本月"}涨粉数
-                </p>
-              </CardContent>
-            </Card>
+              <Card className="shadow-none">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">涨粉对比</CardTitle>
+                  <CardDescription className="text-xs">TOP 脚本带来的新增粉丝</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={chartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                      <CartesianGrid stroke="var(--border)" strokeDasharray="0" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: "var(--muted)" }} />
+                      <Bar dataKey="followers" fill="var(--foreground)" name="涨粉" radius={[3, 3, 0, 0]} maxBarSize={28} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4" />
-                  总播放量
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  {(stats?.totalViews || 0).toLocaleString()}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {timeRange === "week" ? "本周" : "本月"}播放量
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Views Trend */}
-            <Card>
-              <CardHeader>
-                <CardTitle>播放量趋势</CardTitle>
-                <CardDescription>过去 7 天的播放量变化</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="views"
-                      stroke="#3b82f6"
-                      name="播放量"
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            {/* Followers Trend */}
-            <Card>
-              <CardHeader>
-                <CardTitle>涨粉趋势</CardTitle>
-                <CardDescription>过去 7 天的涨粉变化</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="followers" fill="#10b981" name="涨粉" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Top Scripts */}
-          <Card>
-            <CardHeader>
-              <CardTitle>爆款内容 TOP 5</CardTitle>
-              <CardDescription>播放量最高的脚本</CardDescription>
+          {/* Top Scripts —— 排名表格行 */}
+          <Card className="shadow-none">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">爆款内容 TOP 5</CardTitle>
+              <CardDescription className="text-xs">播放量最高的脚本</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {topScripts && topScripts.length > 0 ? (
-                <div className="space-y-3">
+                <div>
                   {topScripts.map((item, idx) => (
                     <div
                       key={item.script.id}
-                      className="flex items-start justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="flex items-center gap-4 px-6 py-3 border-t border-border hover:bg-accent/60 cursor-pointer transition-colors duration-150"
                       onClick={() => navigate(`/scripts/${item.script.id}`)}
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="secondary" className="text-xs">
-                            #{idx + 1}
-                          </Badge>
-                          <h3 className="font-medium">{item.script.title}</h3>
-                        </div>
-                        <div className="flex gap-2 text-sm text-gray-600">
-                          <span>{item.script.topicTag}</span>
-                          <span>·</span>
-                          <span>{item.script.hookType}</span>
-                        </div>
+                      <span className="font-data text-xs text-muted-foreground w-5 text-right shrink-0">
+                        {String(idx + 1).padStart(2, "0")}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-medium truncate">{item.script.title}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {item.script.topicTag} · {item.script.hookType}
+                        </p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-lg">
+                      <div className="text-right shrink-0">
+                        <p className="font-data text-sm font-medium">
                           {(item.metric?.views || 0).toLocaleString()}
                         </p>
-                        <p className="text-xs text-gray-500">播放量</p>
+                        <p className="text-[11px] text-muted-foreground">播放量</p>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-600">暂无数据</p>
+                <div className="text-center py-10 border-t border-border">
+                  <p className="text-sm text-muted-foreground">暂无数据，发布脚本并录入数据后展示</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Account Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle>账号状态</CardTitle>
-              <CardDescription>各账号的运营状态</CardDescription>
+          {/* Account Status —— 表格行 */}
+          <Card className="shadow-none">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">账号状态</CardTitle>
+              <CardDescription className="text-xs">各账号的运营状态</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {accounts && accounts.length > 0 ? (
-                <div className="space-y-3">
+                <div>
                   {accounts.map((account) => (
                     <div
                       key={account.id}
-                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="flex items-center gap-4 px-6 py-3 border-t border-border hover:bg-accent/60 cursor-pointer transition-colors duration-150"
                       onClick={() => navigate(`/accounts/${account.id}`)}
                     >
-                      <div className="flex-1">
-                        <h3 className="font-medium">{account.name}</h3>
-                        <p className="text-sm text-gray-600">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-medium truncate">{account.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {account.platform} · {account.category}
                         </p>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-semibold">
-                            {(account.followerCount || 0).toLocaleString()}
-                          </p>
-                          <p className="text-xs text-gray-500">粉丝</p>
-                        </div>
-                        <Badge
-                          className={
-                            account.status === "成熟"
-                              ? "bg-green-100 text-green-800"
-                              : account.status === "孵化中"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-gray-100 text-gray-800"
-                          }
-                        >
-                          {account.status || "孵化中"}
-                        </Badge>
+                      <div className="text-right shrink-0">
+                        <p className="font-data text-sm font-medium">
+                          {(account.followerCount || 0).toLocaleString()}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">粉丝</p>
                       </div>
+                      <StatusDot status={account.status || "孵化中"} className="w-16 justify-end" />
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-600">暂无账号</p>
+                <div className="text-center py-10 border-t border-border">
+                  <p className="text-sm text-muted-foreground">暂无账号</p>
                 </div>
               )}
             </CardContent>

@@ -2,12 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
+import { StatStrip, StatusDot, Tag } from "@/components/Meta";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { ArrowLeft, Plus, BarChart3 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Plus, BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -69,13 +68,6 @@ export default function ScriptDetail({ scriptId }: ScriptDetailProps) {
     }
   };
 
-  const statusColors: Record<string, string> = {
-    "草稿": "bg-gray-100 text-gray-800",
-    "审核": "bg-yellow-100 text-yellow-800",
-    "发布": "bg-green-100 text-green-800",
-    "归档": "bg-gray-100 text-gray-800",
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -86,9 +78,9 @@ export default function ScriptDetail({ scriptId }: ScriptDetailProps) {
 
   if (!script) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-600 mb-4">脚本不存在</p>
-        <Button onClick={() => navigate("/scripts")}>返回脚本列表</Button>
+      <div className="text-center py-16 border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground mb-4">脚本不存在</p>
+        <Button variant="outline" size="sm" onClick={() => navigate("/scripts")}>返回脚本库</Button>
       </div>
     );
   }
@@ -99,124 +91,89 @@ export default function ScriptDetail({ scriptId }: ScriptDetailProps) {
     : "0";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/scripts")}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          返回
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight">{script.title}</h1>
-          <p className="text-gray-600 mt-1">
-            {script.publishDate
-              ? new Date(script.publishDate).toLocaleDateString("zh-CN")
-              : "未发布"}
-          </p>
-        </div>
-        <Badge className={statusColors[script.status || "草稿"]}>
-          {script.status || "草稿"}
-        </Badge>
-      </div>
-
-      {/* Script Content */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div>
-              <CardTitle>脚本内容</CardTitle>
-              <CardDescription>选题标签：{script.topicTag} · 钩子类型：{script.hookType}</CardDescription>
+      <div>
+        <button
+          onClick={() => navigate("/scripts")}
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 mb-4"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          脚本库
+        </button>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-semibold tracking-tight">{script.title}</h1>
+              <StatusDot status={script.status || "草稿"} />
+            </div>
+            <div className="flex items-center gap-2 mt-2.5">
+              <Tag>{script.topicTag}</Tag>
+              <Tag>{script.hookType}</Tag>
+              <span className="font-data text-xs text-muted-foreground ml-1">
+                {script.publishDate
+                  ? new Date(script.publishDate).toLocaleDateString("zh-CN")
+                  : "未发布"}
+              </span>
             </div>
           </div>
+          {script.videoUrl && (
+            <a
+              href={script.videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 decoration-border transition-colors duration-150 pt-2"
+            >
+              查看成片
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Metrics Summary */}
+      {latestMetric && (
+        <StatStrip
+          items={[
+            { label: "播放量", value: (latestMetric.views || 0).toLocaleString() },
+            { label: "点赞", value: (latestMetric.likes || 0).toLocaleString() },
+            { label: "评论", value: (latestMetric.comments || 0).toLocaleString() },
+            { label: "涨粉", value: (latestMetric.newFollowers || 0).toLocaleString() },
+            { label: "互动率", value: `${engagementRate}%` },
+          ]}
+        />
+      )}
+
+      {/* Script Content */}
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">脚本内容</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           <div>
-            <Label className="text-sm text-gray-600">正文</Label>
-            <p className="mt-2 text-gray-800 whitespace-pre-wrap">{script.content}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">正文</p>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{script.content}</p>
           </div>
           {script.ending && (
             <div>
-              <Label className="text-sm text-gray-600">结尾</Label>
-              <p className="mt-2 text-gray-800">{script.ending}</p>
-            </div>
-          )}
-          {script.videoUrl && (
-            <div>
-              <Label className="text-sm text-gray-600">成片链接</Label>
-              <a
-                href={script.videoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
-              >
-                查看视频
-              </a>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">结尾</p>
+              <p className="text-sm leading-relaxed">{script.ending}</p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Metrics Summary */}
-      {latestMetric && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">播放量</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{(latestMetric.views || 0).toLocaleString()}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">点赞</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{(latestMetric.likes || 0).toLocaleString()}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">评论</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{(latestMetric.comments || 0).toLocaleString()}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">涨粉</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{(latestMetric.newFollowers || 0).toLocaleString()}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">互动率</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{engagementRate}%</div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {/* Metrics Timeline */}
-      <Card>
+      <Card className="shadow-none">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>数据记录</CardTitle>
-            <CardDescription>脚本发布后的各阶段数据表现</CardDescription>
+            <CardTitle className="text-sm font-medium">数据记录</CardTitle>
+            <CardDescription className="text-xs mt-1">发布后各阶段的数据表现</CardDescription>
           </div>
           <Dialog open={metricsOpen} onOpenChange={setMetricsOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="gap-2">
-                <Plus className="w-4 h-4" />
+              <Button size="sm" variant="outline" className="gap-1.5">
+                <Plus className="w-3.5 h-3.5" />
                 录入数据
               </Button>
             </DialogTrigger>
@@ -352,9 +309,11 @@ export default function ScriptDetail({ scriptId }: ScriptDetailProps) {
                     )}
                   />
 
-                  <Button type="submit" className="w-full" disabled={createMetricsMutation.isPending}>
-                    {createMetricsMutation.isPending ? "录入中..." : "确认录入"}
-                  </Button>
+                  <div className="flex justify-end pt-2">
+                    <Button type="submit" disabled={createMetricsMutation.isPending}>
+                      {createMetricsMutation.isPending ? "录入中…" : "确认录入"}
+                    </Button>
+                  </div>
                 </form>
               </Form>
             </DialogContent>
@@ -362,30 +321,32 @@ export default function ScriptDetail({ scriptId }: ScriptDetailProps) {
         </CardHeader>
         <CardContent>
           {metrics && metrics.length > 0 ? (
-            <div className="space-y-3">
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="grid grid-cols-4 gap-4 px-4 py-2.5 bg-muted/60 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <span>日期</span>
+                <span className="text-right">播放</span>
+                <span className="text-right">点赞</span>
+                <span className="text-right">涨粉</span>
+              </div>
               {metrics.map((metric, idx) => (
                 <div
                   key={metric.id}
-                  className="flex items-start justify-between p-3 border rounded-lg bg-gray-50"
+                  className={`grid grid-cols-4 gap-4 px-4 py-3 text-sm ${idx > 0 ? "border-t border-border" : "border-t border-border"}`}
                 >
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">
-                      第 {idx + 1} 次录入 · {new Date(metric.recordDate).toLocaleDateString("zh-CN")}
-                    </p>
-                    <div className="grid grid-cols-3 gap-4 mt-2 text-sm text-gray-600">
-                      <div>播放：{(metric.views || 0).toLocaleString()}</div>
-                      <div>点赞：{(metric.likes || 0).toLocaleString()}</div>
-                      <div>涨粉：{(metric.newFollowers || 0).toLocaleString()}</div>
-                    </div>
-                  </div>
+                  <span className="font-data text-xs text-muted-foreground self-center">
+                    {new Date(metric.recordDate).toLocaleDateString("zh-CN")}
+                  </span>
+                  <span className="font-data text-right">{(metric.views || 0).toLocaleString()}</span>
+                  <span className="font-data text-right">{(metric.likes || 0).toLocaleString()}</span>
+                  <span className="font-data text-right">{(metric.newFollowers || 0).toLocaleString()}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600 mb-4">还没有数据记录</p>
-              <Button onClick={() => setMetricsOpen(true)} size="sm">
+            <div className="text-center py-10 border border-dashed border-border rounded-lg">
+              <BarChart3 className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" strokeWidth={1.5} />
+              <p className="text-sm text-muted-foreground mb-4">还没有数据记录</p>
+              <Button onClick={() => setMetricsOpen(true)} variant="outline" size="sm">
                 录入数据
               </Button>
             </div>

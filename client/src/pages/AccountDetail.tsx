@@ -1,10 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
+import { StatStrip, StatusDot, Tag } from "@/components/Meta";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { ArrowLeft, Users, TrendingUp } from "lucide-react";
+import { ArrowLeft, ArrowUpRight } from "lucide-react";
 
 interface AccountDetailProps {
   accountId: string;
@@ -14,12 +13,6 @@ export default function AccountDetail({ accountId }: AccountDetailProps) {
   const [, navigate] = useLocation();
   const { data: account, isLoading } = trpc.accounts.getById.useQuery(accountId);
   const { data: scripts } = trpc.scripts.list.useQuery({ accountId });
-
-  const statusColors: Record<string, string> = {
-    "孵化中": "bg-blue-100 text-blue-800",
-    "成熟": "bg-green-100 text-green-800",
-    "暂停": "bg-gray-100 text-gray-800",
-  };
 
   if (isLoading) {
     return (
@@ -31,152 +24,118 @@ export default function AccountDetail({ accountId }: AccountDetailProps) {
 
   if (!account) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-600 mb-4">账号不存在</p>
-        <Button onClick={() => navigate("/accounts")}>返回账号列表</Button>
+      <div className="text-center py-16 border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground mb-4">账号不存在</p>
+        <Button variant="outline" size="sm" onClick={() => navigate("/accounts")}>
+          返回账号列表
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/accounts")}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          返回
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{account.name}</h1>
-          <p className="text-gray-600 mt-1">{account.platform} · {account.category}</p>
+      <div>
+        <button
+          onClick={() => navigate("/accounts")}
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 mb-4"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          账号管理
+        </button>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold tracking-tight">{account.name}</h1>
+              <StatusDot status={account.status || "孵化中"} />
+            </div>
+            <p className="text-sm text-muted-foreground mt-1.5">
+              {account.platform} · {account.category}
+              {account.assignedEditor && <> · 编导 {account.assignedEditor}</>}
+            </p>
+          </div>
+          {account.accountUrl && (
+            <a
+              href={account.accountUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 decoration-border transition-colors duration-150 pt-2"
+            >
+              平台主页
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </a>
+          )}
         </div>
       </div>
 
-      {/* Account Info */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">粉丝数</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {(account.followerCount || 0).toLocaleString()}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">当前粉丝数</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">状态</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Badge className={statusColors[account.status || "孵化中"]}>
-              {account.status || "孵化中"}
-            </Badge>
-            <p className="text-xs text-gray-500 mt-2">账号状态</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">脚本数</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{scripts?.length || 0}</div>
-            <p className="text-xs text-gray-500 mt-1">已发布脚本</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Account Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>账号详情</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">平台</p>
-              <p className="font-medium">{account.platform}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">分类</p>
-              <p className="font-medium">{account.category}</p>
-            </div>
-            {account.assignedEditor && (
-              <div>
-                <p className="text-sm text-gray-600">负责编导</p>
-                <p className="font-medium">{account.assignedEditor}</p>
-              </div>
-            )}
-            {account.accountUrl && (
-              <div>
-                <p className="text-sm text-gray-600">主页链接</p>
-                <a
-                  href={account.accountUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline truncate"
-                >
-                  访问
-                </a>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* KPI Strip */}
+      <StatStrip
+        items={[
+          {
+            label: "当前粉丝",
+            value: (account.followerCount || 0).toLocaleString(),
+          },
+          {
+            label: "脚本总数",
+            value: String(scripts?.length || 0),
+          },
+          {
+            label: "已发布",
+            value: String(scripts?.filter((s) => s.status === "发布").length || 0),
+          },
+        ]}
+      />
 
       {/* Scripts */}
-      <Card>
-        <CardHeader>
-          <CardTitle>脚本列表</CardTitle>
-          <CardDescription>该账号下的所有脚本</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {scripts && scripts.length > 0 ? (
-            <div className="space-y-3">
-              {scripts.map((script) => (
-                <div
-                  key={script.id}
-                  className="flex items-start justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/scripts/${script.id}`)}
-                >
-                  <div className="flex-1">
-                    <p className="font-medium">{script.title}</p>
-                    <div className="flex gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">
-                        {script.topicTag}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {script.hookType}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {script.status}
-                      </Badge>
+      <section>
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-sm font-medium">脚本列表</h2>
+          <span className="font-data text-xs text-muted-foreground">
+            {scripts?.length || 0} 条
+          </span>
+        </div>
+        {scripts && scripts.length > 0 ? (
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            {scripts.map((script, idx) => (
+              <div
+                key={script.id}
+                className={`cursor-pointer px-5 py-4 hover:bg-accent/60 transition-colors duration-150 group ${
+                  idx > 0 ? "border-t border-border" : ""
+                }`}
+                onClick={() => navigate(`/scripts/${script.id}`)}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <p className="text-sm font-medium group-hover:underline underline-offset-4 decoration-border">
+                        {script.title}
+                      </p>
+                      <StatusDot status={script.status || "草稿"} />
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <Tag>{script.topicTag}</Tag>
+                      <Tag>{script.hookType}</Tag>
                     </div>
                   </div>
-                  <div className="text-right text-sm text-gray-500">
+                  <span className="font-data text-xs text-muted-foreground shrink-0 pt-0.5">
                     {script.publishDate
                       ? new Date(script.publishDate).toLocaleDateString("zh-CN")
                       : "未发布"}
-                  </div>
+                  </span>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-gray-600">还没有脚本</p>
-              <Button
-                className="mt-4"
-                onClick={() => navigate("/scripts")}
-              >
-                创建脚本
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 border border-dashed border-border rounded-lg">
+            <p className="text-sm text-muted-foreground mb-4">还没有脚本</p>
+            <Button variant="outline" size="sm" onClick={() => navigate("/scripts")}>
+              创建脚本
+            </Button>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

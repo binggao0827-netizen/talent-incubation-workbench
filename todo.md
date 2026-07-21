@@ -123,3 +123,22 @@
 - [x] 项目初始化（web-db-user 模板）
 - [x] 设计整体架构和技术方案
 - [x] 确认设计风格（现代极简 SaaS）
+
+---
+
+## UI 精细化改造（去 AI 感，简约高级）
+
+- [x] 制定设计 token 系统（色彩、字体、间距、圆角、阴影）
+- [x] 更新 index.css 全局设计变量与基础样式
+- [x] DashboardLayout 侧边栏视觉升级
+- [x] Home 着陆页去 AI 感改造
+- [x] AccountsList / AccountDetail 页面精细化
+- [x] ScriptsList / ScriptDetail 页面精细化
+- [x] ReviewsList 页面精细化
+- [x] Dashboard 老板看板图表与 KPI 卡片精细化
+- [x] AIFeatures 页面去除过度装饰（渐变、emoji 图标等）
+- [x] 数据展示使用等宽数字字体（tabular-nums）
+- [x] 截图验证改造效果
+- [x] 修复 Dashboard 无限加载（getStats 查询入参引用不稳定，已用 useMemo 修复）
+- [x] NotFound 页面对齐新设计语言
+- [x] 保存新检查点并交付

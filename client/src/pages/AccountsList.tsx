@@ -5,12 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader, StatusDot } from "@/components/Meta";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { useState } from "react";
-import { Plus, Users, TrendingUp } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,36 +63,29 @@ export default function AccountsList() {
     }
   };
 
-  const statusColors: Record<string, string> = {
-    "孵化中": "bg-blue-100 text-blue-800",
-    "成熟": "bg-green-100 text-green-800",
-    "暂停": "bg-gray-100 text-gray-800",
-  };
-
-  const platformIcons: Record<string, string> = {
-    "抖音": "🎵",
-    "小红书": "📱",
-    "B站": "🎬",
-    "视频号": "📺",
+  // 平台字标：单色方块 + 首字，取代 emoji
+  const platformMark: Record<string, string> = {
+    "抖音": "抖",
+    "小红书": "红",
+    "B站": "B",
+    "视频号": "视",
   };
 
   if (!user?.role || (user.role !== "admin" && user.role !== "user")) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">无权限访问此页面</p>
+        <p className="text-sm text-muted-foreground">无权限访问此页面</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">账号管理</h1>
-          <p className="text-gray-600 mt-2">管理所有达人账号，追踪粉丝增长和内容表现</p>
-        </div>
-        {user.role === "admin" && (
+    <div className="space-y-8">
+      <PageHeader
+        title="账号管理"
+        description="管理达人账号，追踪粉丝增长与内容表现"
+        actions={
+          user.role === "admin" ? (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
@@ -217,15 +210,18 @@ export default function AccountsList() {
                     )}
                   />
 
-                  <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                    {createMutation.isPending ? "创建中..." : "创建账号"}
-                  </Button>
+                  <div className="flex justify-end pt-2">
+                    <Button type="submit" disabled={createMutation.isPending}>
+                      {createMutation.isPending ? "创建中…" : "创建账号"}
+                    </Button>
+                  </div>
                 </form>
               </Form>
             </DialogContent>
           </Dialog>
-        )}
-      </div>
+          ) : undefined
+        }
+      />
 
       {/* Accounts Grid */}
       {isLoading ? (
@@ -237,53 +233,55 @@ export default function AccountsList() {
           {accounts.map((account) => (
             <Card
               key={account.id}
-              className="cursor-pointer hover:shadow-lg transition-shadow"
+              className="cursor-pointer shadow-none hover:border-foreground/25 transition-colors duration-150 group"
               onClick={() => navigate(`/accounts/${account.id}`)}
             >
               <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-2xl">{platformIcons[account.platform]}</span>
-                      <CardTitle className="text-lg">{account.name}</CardTitle>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-md border border-border bg-muted/60 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-semibold text-foreground/70">
+                        {platformMark[account.platform] || account.platform.charAt(0)}
+                      </span>
                     </div>
-                    <CardDescription>{account.platform}</CardDescription>
+                    <div className="min-w-0">
+                      <CardTitle className="text-base truncate group-hover:underline underline-offset-4 decoration-border">
+                        {account.name}
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-0.5">
+                        {account.platform} · {account.category}
+                      </CardDescription>
+                    </div>
                   </div>
-                  <Badge className={statusColors[account.status || "孵化中"]}>
-                    {account.status || "孵化中"}
-                  </Badge>
+                  <StatusDot status={account.status || "孵化中"} className="shrink-0 pt-1" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Users className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-700 font-medium">
-                    {(account.followerCount || 0).toLocaleString()} 粉丝
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <TrendingUp className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-600">{account.category}</span>
-                </div>
-                {account.assignedEditor && (
-                  <div className="text-xs text-gray-500 pt-2 border-t">
-                    负责编导：{account.assignedEditor}
+              <CardContent>
+                <div className="flex items-end justify-between pt-1 border-t border-border">
+                  <div className="pt-3">
+                    <p className="font-data text-xl font-medium leading-none">
+                      {(account.followerCount || 0).toLocaleString()}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-1.5">粉丝</p>
                   </div>
-                )}
+                  {account.assignedEditor && (
+                    <p className="text-xs text-muted-foreground pt-3">
+                      编导：{account.assignedEditor}
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       ) : (
-        <Card className="text-center py-12">
-          <CardContent>
-            <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 mb-4">还没有账号，点击"新增账号"开始</p>
-            {user.role === "admin" && (
-              <Button onClick={() => setOpen(true)}>新增账号</Button>
-            )}
-          </CardContent>
-        </Card>
+        <div className="text-center py-16 border border-dashed border-border rounded-lg">
+          <Users className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" strokeWidth={1.5} />
+          <p className="text-sm text-muted-foreground mb-4">还没有账号，点击“新增账号”开始</p>
+          {user.role === "admin" && (
+            <Button variant="outline" size="sm" onClick={() => setOpen(true)}>新增账号</Button>
+          )}
+        </div>
       )}
     </div>
   );

@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/Meta";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Sparkles, Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -111,181 +112,177 @@ export default function AIFeatures() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">AI 智能功能</h1>
-          <p className="text-muted-foreground mt-2">
-            利用 AI 能力提升内容创作效率，自动生成周报、分析规律、脑暴选题
-          </p>
-        </div>
+      <div className="space-y-8">
+        <PageHeader
+          title="AI 助手"
+          description="基于工作台已有数据生成周报、分析规律、脑暴选题"
+        />
 
         <Tabs defaultValue="weekly" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList>
             <TabsTrigger value="weekly">周报生成</TabsTrigger>
             <TabsTrigger value="analysis">规律分析</TabsTrigger>
             <TabsTrigger value="ideas">选题脑暴</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="weekly" className="space-y-4">
-            <Card>
+          <TabsContent value="weekly" className="space-y-4 mt-4">
+            <Card className="shadow-none">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5" />
-                  AI 周报生成
-                </CardTitle>
-                <CardDescription>
-                  基于本周发布的脚本和数据表现，AI 自动生成结构化周报
-                </CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-sm font-medium">周报生成</CardTitle>
+                    <CardDescription className="text-xs mt-1">
+                      汇总本周发布的脚本与数据表现，生成结构化周报
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={handleGenerateWeeklyReport}
+                    disabled={loadingReport}
+                    size="sm"
+                    className="shrink-0"
+                  >
+                    {loadingReport ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        生成中…
+                      </>
+                    ) : (
+                      "生成本周周报"
+                    )}
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Button
-                  onClick={handleGenerateWeeklyReport}
-                  disabled={loadingReport}
-                  className="w-full"
-                >
-                  {loadingReport ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      生成中...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      生成本周周报
-                    </>
-                  )}
-                </Button>
+              <CardContent>
 
-                {weeklyReport && (
-                  <div className="mt-6 p-4 bg-muted rounded-lg border">
+                {weeklyReport ? (
+                  <div className="p-5 bg-muted/50 rounded-lg border border-border">
                     <div className="prose prose-sm max-w-none dark:prose-invert">
                       <Streamdown>{weeklyReport}</Streamdown>
                     </div>
                   </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground py-6 text-center border border-dashed border-border rounded-lg">
+                    生成结果将显示在这里
+                  </p>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="analysis" className="space-y-4">
-            <Card>
+          <TabsContent value="analysis" className="space-y-4 mt-4">
+            <Card className="shadow-none">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5" />
-                  爆款规律分析
-                </CardTitle>
-                <CardDescription>
-                  分析表现最好的脚本，找出成功的共同规律
-                </CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-sm font-medium">爆款规律分析</CardTitle>
+                    <CardDescription className="text-xs mt-1">
+                      分析表现最好的脚本，提取成功的共同规律
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={handleAnalyzeTopScripts}
+                    disabled={loadingAnalysis}
+                    size="sm"
+                    className="shrink-0"
+                  >
+                    {loadingAnalysis ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        分析中…
+                      </>
+                    ) : (
+                      "开始分析"
+                    )}
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Button
-                  onClick={handleAnalyzeTopScripts}
-                  disabled={loadingAnalysis}
-                  className="w-full"
-                >
-                  {loadingAnalysis ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      分析中...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      开始分析
-                    </>
-                  )}
-                </Button>
-
-                {scriptAnalysis && (
-                  <div className="mt-6 p-4 bg-muted rounded-lg border">
+              <CardContent>
+                {scriptAnalysis ? (
+                  <div className="p-5 bg-muted/50 rounded-lg border border-border">
                     <div className="prose prose-sm max-w-none dark:prose-invert">
                       <Streamdown>{scriptAnalysis}</Streamdown>
                     </div>
                   </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground py-6 text-center border border-dashed border-border rounded-lg">
+                    分析结果将显示在这里
+                  </p>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="ideas" className="space-y-4">
-            <Card>
+          <TabsContent value="ideas" className="space-y-4 mt-4">
+            <Card className="shadow-none">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5" />
-                  选题脑暴
-                </CardTitle>
-                <CardDescription>
-                  基于历史数据和当前热点，AI 为你生成 10 个创意选题
-                </CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-sm font-medium">选题脑暴</CardTitle>
+                    <CardDescription className="text-xs mt-1">
+                      结合历史数据与热点，生成 10 个创意选题
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={handleGenerateTopicIdeas}
+                    disabled={loadingIdeas}
+                    size="sm"
+                    className="shrink-0"
+                  >
+                    {loadingIdeas ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        脑暴中…
+                      </>
+                    ) : (
+                      "生成选题创意"
+                    )}
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Button
-                  onClick={handleGenerateTopicIdeas}
-                  disabled={loadingIdeas}
-                  className="w-full"
-                >
-                  {loadingIdeas ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      脑暴中...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      生成选题创意
-                    </>
-                  )}
-                </Button>
-
-                {topicIdeas && (
-                  <div className="mt-6 space-y-4">
-                    <div className="p-4 bg-muted rounded-lg border">
+              <CardContent>
+                {topicIdeas ? (
+                  <div className="space-y-4">
+                    <div className="p-5 bg-muted/50 rounded-lg border border-border">
                       <div className="prose prose-sm max-w-none dark:prose-invert">
                         <Streamdown>{topicIdeas}</Streamdown>
                       </div>
                     </div>
-                    <Button
-                      onClick={handleSaveAsDraft}
-                      disabled={savingDraft}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      {savingDraft ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          保存中...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4 mr-2" />
-                          一键存为草稿脚本
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={handleSaveAsDraft}
+                        disabled={savingDraft}
+                        variant="outline"
+                        size="sm"
+                      >
+                        {savingDraft ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                            保存中…
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-3.5 h-3.5 mr-1.5" />
+                            存为草稿脚本
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground py-6 text-center border border-dashed border-border rounded-lg">
+                    选题创意将显示在这里
+                  </p>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>使用说明</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>
-              • <strong>周报生成</strong>：每周自动汇总脚本、数据和复盘，生成结构化周报
-            </p>
-            <p>
-              • <strong>规律分析</strong>：分析过去表现最好的脚本，提取成功规律和改进建议
-            </p>
-            <p>
-              • <strong>选题脑暴</strong>：结合历史数据和热点话题，为下一步创作提供灵感
-            </p>
-          </CardContent>
-        </Card>
+        <div className="border-t border-border pt-5">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            周报生成汇总本周脚本、数据与复盘；规律分析提取历史爆款的共性与改进建议；选题脑暴结合已有数据与热点提供创作灵感。生成结果仅供参考，建议结合实际情况使用。
+          </p>
+        </div>
       </div>
     </DashboardLayout>
   );

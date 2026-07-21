@@ -74,7 +74,7 @@ export default function DashboardLayout({
           <Button
             onClick={() => startLogin()}
             size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
+            className="w-full"
           >
             登录
           </Button>
@@ -136,40 +136,47 @@ function DashboardLayoutContent({
   return (
     <>
       <Sidebar ref={resizeRef}>
-        <SidebarHeader className="border-b px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">达</span>
+        <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-semibold text-xs">达</span>
             </div>
-            <span className="font-semibold text-sm">达人孵化工作台</span>
+            <div className="flex flex-col">
+              <span className="font-semibold text-sm leading-tight tracking-tight">达人孵化工作台</span>
+              <span className="text-[10px] text-muted-foreground leading-tight">Talent Incubation</span>
+            </div>
           </div>
         </SidebarHeader>
 
-        <SidebarContent>
-          <SidebarMenu>
-            {menuItems.map((item) => (
-              <SidebarMenuItem key={item.path}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={location === item.path}
-                  onClick={() => navigate(item.path)}
-                >
-                  <a href={item.path} className="cursor-pointer">
-                    <item.icon className="w-4 h-4" />
-                    <span>{item.label}</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+        <SidebarContent className="px-2 py-3">
+          <SidebarMenu className="gap-0.5">
+            {menuItems.map((item) => {
+              const isActive = location === item.path || location.startsWith(item.path + "/");
+              return (
+                <SidebarMenuItem key={item.path}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive}
+                    onClick={() => navigate(item.path)}
+                  >
+                    <a href={item.path} className="cursor-pointer">
+                      <item.icon className="w-4 h-4" strokeWidth={1.75} />
+                      <span className="flex-1">{item.label}</span>
+                      {isActive && <span className="rec-dot rec-dot-live" aria-hidden="true" />}
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
           </SidebarMenu>
         </SidebarContent>
 
-        <SidebarFooter className="border-t p-4">
+        <SidebarFooter className="border-t border-sidebar-border p-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-accent transition-colors text-left">
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback className="text-xs font-semibold">
+              <button className="flex items-center gap-2.5 w-full p-2 rounded-md hover:bg-sidebar-accent transition-colors duration-150 text-left">
+                <Avatar className="w-7 h-7">
+                  <AvatarFallback className="text-xs font-medium bg-muted text-muted-foreground">
                     {user?.name?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
@@ -192,14 +199,20 @@ function DashboardLayoutContent({
       </Sidebar>
 
       <SidebarInset>
-        <div className="flex items-center justify-between h-16 border-b px-6 sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center h-14 border-b px-6 sticky top-0 z-10 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
           <SidebarTrigger className="-ml-1" />
-          <div className="flex-1 ml-4">
-            <h1 className="text-lg font-semibold">达人孵化工作台</h1>
+          <div className="ml-4 flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">工作台</span>
+            <span className="text-muted-foreground/50">/</span>
+            <span className="font-medium">
+              {menuItems.find((m) => location === m.path || location.startsWith(m.path + "/"))?.label || "概览"}
+            </span>
           </div>
         </div>
-        <main className="flex-1 p-6">
-          {children}
+        <main className="flex-1 px-6 py-8 lg:px-10">
+          <div className="mx-auto max-w-6xl">
+            {children}
+          </div>
         </main>
       </SidebarInset>
 
@@ -207,7 +220,7 @@ function DashboardLayoutContent({
       {!isMobile && open && (
         <div
           onMouseDown={handleMouseDown}
-          className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-500 hover:w-1 transition-all"
+          className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-border transition-all"
           style={{
             position: "absolute",
             right: 0,

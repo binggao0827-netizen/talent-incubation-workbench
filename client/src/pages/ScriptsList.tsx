@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader, StatusDot, Tag } from "@/components/Meta";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -86,21 +86,12 @@ export default function ScriptsList() {
     }
   };
 
-  const statusColors: Record<string, string> = {
-    "草稿": "bg-gray-100 text-gray-800",
-    "审核": "bg-yellow-100 text-yellow-800",
-    "发布": "bg-green-100 text-green-800",
-    "归档": "bg-gray-100 text-gray-800",
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">脚本库</h1>
-          <p className="text-gray-600 mt-2">管理所有脚本，追踪选题与数据表现</p>
-        </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="脚本库"
+        description="管理脚本，追踪选题与数据表现"
+        actions={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
@@ -239,25 +230,28 @@ export default function ScriptsList() {
                   )}
                 />
 
-                <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "创建中..." : "创建脚本"}
-                </Button>
+                <div className="flex justify-end pt-2">
+                  <Button type="submit" disabled={createMutation.isPending}>
+                    {createMutation.isPending ? "创建中…" : "创建脚本"}
+                  </Button>
+                </div>
               </form>
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
+        }
+      />
 
       {/* Filters */}
-      <div className="flex gap-4 flex-wrap">
+      <div className="flex gap-2 flex-wrap">
         <Input
-          placeholder="搜索脚本..."
-          className="max-w-xs"
+          placeholder="搜索脚本…"
+          className="max-w-xs h-9"
           value={filters.search}
           onChange={(e) => setFilters({ ...filters, search: e.target.value })}
         />
         <Select value={filters.topicTag || "all"} onValueChange={(value) => setFilters({ ...filters, topicTag: value === "all" ? "" : value })}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-36 h-9">
             <SelectValue placeholder="选题标签" />
           </SelectTrigger>
           <SelectContent>
@@ -271,7 +265,7 @@ export default function ScriptsList() {
           </SelectContent>
         </Select>
         <Select value={filters.status || "all"} onValueChange={(value) => setFilters({ ...filters, status: value === "all" ? "" : value })}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-36 h-9">
             <SelectValue placeholder="脚本状态" />
           </SelectTrigger>
           <SelectContent>
@@ -290,44 +284,44 @@ export default function ScriptsList() {
           <Spinner />
         </div>
       ) : scripts && scripts.length > 0 ? (
-        <div className="space-y-3">
-          {scripts.map((script) => (
-            <Card
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          {scripts.map((script, idx) => (
+            <div
               key={script.id}
-              className="cursor-pointer hover:shadow-md transition-shadow"
+              className={`cursor-pointer px-5 py-4 hover:bg-accent/60 transition-colors duration-150 group ${
+                idx > 0 ? "border-t border-border" : ""
+              }`}
               onClick={() => navigate(`/scripts/${script.id}`)}
             >
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg mb-2">{script.title}</h3>
-                    <div className="flex gap-2 flex-wrap mb-3">
-                      <Badge variant="outline">{script.topicTag}</Badge>
-                      <Badge variant="outline">{script.hookType}</Badge>
-                      <Badge className={statusColors[script.status || "草稿"]}>
-                        {script.status || "草稿"}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-600 line-clamp-2">{script.content}</p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h3 className="text-sm font-medium group-hover:underline underline-offset-4 decoration-border">
+                      {script.title}
+                    </h3>
+                    <StatusDot status={script.status || "草稿"} />
                   </div>
-                  <div className="text-right text-sm text-gray-500 ml-4">
-                    {script.publishDate
-                      ? new Date(script.publishDate).toLocaleDateString("zh-CN")
-                      : "未发布"}
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <Tag>{script.topicTag}</Tag>
+                    <Tag>{script.hookType}</Tag>
                   </div>
+                  <p className="text-xs text-muted-foreground line-clamp-1 mt-2">{script.content}</p>
                 </div>
-              </CardContent>
-            </Card>
+                <span className="font-data text-xs text-muted-foreground shrink-0 pt-0.5">
+                  {script.publishDate
+                    ? new Date(script.publishDate).toLocaleDateString("zh-CN")
+                    : "未发布"}
+                </span>
+              </div>
+            </div>
           ))}
         </div>
       ) : (
-        <Card className="text-center py-12">
-          <CardContent>
-            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 mb-4">还没有脚本，点击"新增脚本"开始</p>
-            <Button onClick={() => setOpen(true)}>新增脚本</Button>
-          </CardContent>
-        </Card>
+        <div className="text-center py-16 border border-dashed border-border rounded-lg">
+          <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" strokeWidth={1.5} />
+          <p className="text-sm text-muted-foreground mb-4">还没有脚本，点击“新增脚本”开始</p>
+          <Button variant="outline" size="sm" onClick={() => setOpen(true)}>新增脚本</Button>
+        </div>
       )}
     </div>
   );
