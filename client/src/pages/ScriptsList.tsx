@@ -256,12 +256,12 @@ export default function ScriptsList() {
           value={filters.search}
           onChange={(e) => setFilters({ ...filters, search: e.target.value })}
         />
-        <Select value={filters.topicTag} onValueChange={(value) => setFilters({ ...filters, topicTag: value })}>
+        <Select value={filters.topicTag || "all"} onValueChange={(value) => setFilters({ ...filters, topicTag: value === "all" ? "" : value })}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="选题标签" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">全部标签</SelectItem>
+            <SelectItem value="all">全部标签</SelectItem>
             <SelectItem value="剧情">剧情</SelectItem>
             <SelectItem value="测评">测评</SelectItem>
             <SelectItem value="教程">教程</SelectItem>
@@ -270,12 +270,12 @@ export default function ScriptsList() {
             <SelectItem value="知识">知识</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+        <Select value={filters.status || "all"} onValueChange={(value) => setFilters({ ...filters, status: value === "all" ? "" : value })}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="脚本状态" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">全部状态</SelectItem>
+            <SelectItem value="all">全部状态</SelectItem>
             <SelectItem value="草稿">草稿</SelectItem>
             <SelectItem value="审核">审核</SelectItem>
             <SelectItem value="发布">发布</SelectItem>

@@ -14,6 +14,7 @@ import ScriptsList from "./pages/ScriptsList";
 import ScriptDetail from "./pages/ScriptDetail";
 import ReviewsList from "./pages/ReviewsList";
 import Dashboard from "./pages/Dashboard";
+import AIFeatures from "./pages/AIFeatures";
 
 function Router() {
   return (
@@ -75,7 +76,14 @@ function Router() {
 
       {/* 404 */}
       <Route path={"/404"} component={NotFound} />
-      <Route component={NotFound} />
+      {/* AI Features route */}
+      <Route path={"/ai"}>
+        {() => (
+          <AIFeatures />
+        )}
+      </Route>
+
+      <Route path={"*"} component={NotFound} />
     </Switch>
   );
 }

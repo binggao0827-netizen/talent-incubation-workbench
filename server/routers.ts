@@ -5,6 +5,7 @@ import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
 import { TRPCError } from "@trpc/server";
+import * as ai from "./ai";
 
 // Helper to check if user is admin
 function isAdmin(userRole?: string): boolean {
@@ -355,6 +356,55 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN" });
         }
         return db.createHotTopic(input);
+      }),
+  }),
+
+  // ========== AI Router ==========
+  ai: router({
+    generateWeeklyReport: protectedProcedure
+      .input(z.object({
+        weekStart: z.date(),
+        weekEnd: z.date(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const report = await ai.generateWeeklyReport(input.weekStart, input.weekEnd);
+          return { success: true, report };
+        } catch (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to generate weekly report",
+          });
+        }
+      }),
+
+    analyzeTopScripts: protectedProcedure.mutation(async () => {
+      try {
+        const analysis = await ai.analyzeTopScriptPatterns();
+        return { success: true, analysis };
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to analyze script patterns",
+        });
+      }
+    }),
+
+    generateTopicIdeas: protectedProcedure
+      .input(z.object({
+        accountId: z.string().optional(),
+        hotTopics: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const ideas = await ai.generateTopicIdeas(input.accountId, input.hotTopics);
+          return { success: true, ideas };
+        } catch (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to generate topic ideas",
+          });
+        }
       }),
   }),
 });
