@@ -350,11 +350,9 @@ export default function ScriptsList() {
                   <div>
                     <Label htmlFor="upload-account">关联账号</Label>
                     <Select value={uploadAccountId} onValueChange={setUploadAccountId}>
-                      <FormControl>
-                        <SelectTrigger id="upload-account" className="mt-1">
-                          <SelectValue placeholder="选择账号（可选）" />
-                        </SelectTrigger>
-                      </FormControl>
+                      <SelectTrigger id="upload-account" className="mt-1">
+                        <SelectValue placeholder="选择账号（可选）" />
+                      </SelectTrigger>
                       <SelectContent>
                         {accounts?.map((account) => (
                           <SelectItem key={account.id} value={account.id}>
