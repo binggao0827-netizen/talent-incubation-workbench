@@ -62,6 +62,7 @@ export default function ScriptsList() {
   // Local upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [documentTitle, setDocumentTitle] = useState("");
+  const [uploadAccountId, setUploadAccountId] = useState("");
   const [parsedScripts, setParsedScripts] = useState<ParsedScript[]>([]);
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [selectedScriptIndex, setSelectedScriptIndex] = useState<number | null>(null);
@@ -158,6 +159,9 @@ export default function ScriptsList() {
   const handleSelectScript = (script: ParsedScript) => {
     form.setValue("title", script.title);
     form.setValue("content", script.content);
+    if (uploadAccountId) {
+      form.setValue("accountId", uploadAccountId);
+    }
     setActiveTab("manual");
     toast.success("已填充脚本信息，请完成其他字段后提交");
   };
@@ -342,6 +346,28 @@ export default function ScriptsList() {
               {/* Local Upload Tab */}
               <TabsContent value="upload" className="space-y-4">
                 <div className="space-y-4">
+                  {/* Account Selection */}
+                  <div>
+                    <Label htmlFor="upload-account">关联账号</Label>
+                    <Select value={uploadAccountId} onValueChange={setUploadAccountId}>
+                      <FormControl>
+                        <SelectTrigger id="upload-account" className="mt-1">
+                          <SelectValue placeholder="选择账号（可选）" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts?.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.accountName} ({account.platform})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      选择一个账号，解析后的脚本将自动关联此账号
+                    </p>
+                  </div>
+
                   {/* Document Title Input */}
                   <div>
                     <Label htmlFor="doc-title">文档标题（用于提取月份）</Label>
