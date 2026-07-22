@@ -1,37 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { StatStrip, StatusDot, Tag } from "@/components/Meta";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { ArrowLeft, ArrowUpRight, Plus, BarChart3 } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-
-const metricsFormSchema = z.object({
-  views: z.number().optional(),
-  likes: z.number().optional(),
-  comments: z.number().optional(),
-  shares: z.number().optional(),
-  newFollowers: z.number().optional(),
-  completionRate: z.string().optional(),
-  recordDate: z.string(),
-});
-
-type MetricsFormValues = z.infer<typeof metricsFormSchema>;
+import { ArrowLeft, ArrowUpRight, BarChart3 } from "lucide-react";
 
 interface ScriptDetailProps {
   scriptId: string;
@@ -39,34 +12,9 @@ interface ScriptDetailProps {
 
 export default function ScriptDetail({ scriptId }: ScriptDetailProps) {
   const [, navigate] = useLocation();
-  const [metricsOpen, setMetricsOpen] = useState(false);
 
   const { data: script, isLoading } = trpc.scripts.getById.useQuery(scriptId);
-  const { data: metrics, refetch: refetchMetrics } = trpc.metrics.getByScriptId.useQuery(scriptId);
-  const createMetricsMutation = trpc.metrics.create.useMutation();
-
-  const form = useForm<MetricsFormValues>({
-    resolver: zodResolver(metricsFormSchema),
-    defaultValues: {
-      recordDate: new Date().toISOString().split("T")[0],
-    },
-  });
-
-  const onSubmit = async (data: MetricsFormValues) => {
-    try {
-      await createMetricsMutation.mutateAsync({
-        scriptId,
-        ...data,
-        recordDate: new Date(data.recordDate),
-      } as any);
-      toast.success("数据录入成功");
-      form.reset();
-      setMetricsOpen(false);
-      refetchMetrics();
-    } catch (error) {
-      toast.error("录入失败，请重试");
-    }
-  };
+  const { data: metrics } = trpc.metrics.getByScriptId.useQuery(scriptId);
 
   if (isLoading) {
     return (
@@ -197,10 +145,7 @@ export default function ScriptDetail({ scriptId }: ScriptDetailProps) {
           ) : (
             <div className="text-center py-10 border border-dashed border-border rounded-lg">
               <BarChart3 className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" strokeWidth={1.5} />
-              <p className="text-sm text-muted-foreground mb-4">还没有数据记录</p>
-              <Button onClick={() => setMetricsOpen(true)} variant="outline" size="sm">
-                录入数据
-              </Button>
+              <p className="text-sm text-muted-foreground">还没有数据记录</p>
             </div>
           )}
         </CardContent>
