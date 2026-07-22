@@ -73,6 +73,11 @@ export function TrendingDashboard() {
 
   // 获取当前平台的数据
   const currentData = platformData || [];
+  
+  // 调试：输出数据中是否包含 imageUrl
+  if (currentData.length > 0 && currentData[0]) {
+    console.log('First item data:', currentData[0]);
+  }
 
   // 获取所有分类
   const allCategories = Array.from(
@@ -354,7 +359,15 @@ export function TrendingDashboard() {
 
                   {/* 操作 */}
                   <div className="col-span-1">
-                    <Button variant="ghost" size="sm" onClick={(e) => e.preventDefault()}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const url = PLATFORM_URLS[selectedPlatform].replace("%s", encodeURIComponent(item.title));
+                        window.open(url, "_blank");
+                      }}
+                    >
                       <ExternalLink className="h-4 w-4" />
                     </Button>
                   </div>
