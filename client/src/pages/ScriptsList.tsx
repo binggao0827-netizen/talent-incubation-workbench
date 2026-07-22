@@ -97,6 +97,9 @@ export default function ScriptsList() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Feishu link state
+  const [feishuLink, setFeishuLink] = useState("");
+  
   // Metrics input state
   const [metricsScriptId, setMetricsScriptId] = useState<string | null>(null);
   const [isSavingMetrics, setIsSavingMetrics] = useState(false);
@@ -122,6 +125,8 @@ export default function ScriptsList() {
   const createMutation = trpc.scripts.create.useMutation();
   const updateMutation = trpc.scripts.update.useMutation();
   const batchImportMutation = trpc.feishu.batchImportScripts.useMutation();
+  const batchCreateMutation = trpc.feishu.batchCreateScripts.useMutation();
+  const parseFeishuMutation = trpc.feishu.parseFeishuDocument.useMutation();
   const createMetricsMutation = trpc.metrics.create.useMutation();
 
   const form = useForm<ScriptFormValues>({
@@ -210,6 +215,45 @@ export default function ScriptsList() {
     } catch (error) {
       console.error("File read error:", error);
       toast.error("读取文件失败");
+      setIsImporting(false);
+    }
+  };
+
+  // Handle Feishu import
+  const handleFeishuImport = async () => {
+    if (!feishuLink.trim() || !documentTitle.trim() || !uploadAccountId) {
+      toast.error("请填写所有必填字段");
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const result = await parseFeishuMutation.mutateAsync({
+        documentUrl: feishuLink,
+      });
+      
+      if (result.scripts && result.scripts.length > 0) {
+        // Batch create scripts from parsed Feishu document
+        const importResult = await batchCreateMutation.mutateAsync({
+          scripts: result.scripts,
+          accountId: uploadAccountId,
+        });
+        
+        setImportResult(importResult);
+        if (importResult.success) {
+          toast.success(`成功导入 ${importResult.createdScripts} 个脚本`);
+          setFeishuLink("");
+          setDocumentTitle("");
+          setUploadAccountId("");
+          refetch();
+        }
+      } else {
+        toast.error("未找到脚本内容，请检查链接是否有效");
+      }
+    } catch (error) {
+      console.error("Feishu import error:", error);
+      toast.error("导入失败，请检查链接是否有效");
+    } finally {
       setIsImporting(false);
     }
   };
@@ -335,9 +379,10 @@ export default function ScriptsList() {
               </DialogDescription>
             </DialogHeader>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="manual">手动创建</TabsTrigger>
                 <TabsTrigger value="upload">本地上传</TabsTrigger>
+                <TabsTrigger value="feishu">飞书链接</TabsTrigger>
               </TabsList>
 
               {/* Manual Creation Tab */}
@@ -560,6 +605,91 @@ export default function ScriptsList() {
                     <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-blue-800">
                       系统将自动解析文档中的所有脚本并直接导入。脚本内容会保留源文档的排版格式（Markdown）。
+                    </p>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Feishu Link Upload Tab */}
+              <TabsContent value="feishu" className="space-y-4">
+                <div className="space-y-4">
+                  {/* Account Selection */}
+                  <div>
+                    <Label htmlFor="feishu-account">关联账号 *</Label>
+                    <Select value={uploadAccountId} onValueChange={setUploadAccountId}>
+                      <SelectTrigger id="feishu-account" className="mt-1">
+                        <SelectValue placeholder="选择账号" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts?.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.accountName} ({account.platform})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      所有导入的脚本都将关联到此账号
+                    </p>
+                  </div>
+
+                  {/* Feishu Link Input */}
+                  <div>
+                    <Label htmlFor="feishu-link">飞书文档链接 *</Label>
+                    <Input
+                      id="feishu-link"
+                      placeholder="例如：https://xxx.feishu.cn/docs/doccn..."
+                      value={feishuLink}
+                      onChange={(e) => setFeishuLink(e.target.value)}
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      支持飞书文档、表格等多种格式
+                    </p>
+                  </div>
+
+                  {/* Document Title Input */}
+                  <div>
+                    <Label htmlFor="feishu-doc-title">文档标题（用于提取月份）*</Label>
+                    <Input
+                      id="feishu-doc-title"
+                      placeholder="例如：2026年5月脚本、5月"
+                      value={documentTitle}
+                      onChange={(e) => setDocumentTitle(e.target.value)}
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      标题中需要包含月份信息（如"5月"或"2026年5月"），系统将自动提取用于脚本编号
+                    </p>
+                  </div>
+
+                  {/* Import Success Message */}
+                  {importResult?.success && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-green-900">导入成功！</p>
+                        <p className="text-sm text-green-800 mt-1">
+                          成功导入 {importResult.createdScripts} 个脚本（共 {importResult.totalScripts} 个）
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Import Button */}
+                  <Button
+                    onClick={handleFeishuImport}
+                    disabled={!feishuLink.trim() || !documentTitle.trim() || !uploadAccountId || isImporting}
+                    className="w-full"
+                  >
+                    {isImporting ? "导入中…" : "一键导入脚本"}
+                  </Button>
+
+                  {/* Info Message */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-blue-800">
+                      系统将自动解析飞书文档中的所有脚本并直接导入。请确保飞书链接有效且您有访问权限。
                     </p>
                   </div>
                 </div>

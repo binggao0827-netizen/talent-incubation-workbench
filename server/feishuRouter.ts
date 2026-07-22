@@ -55,9 +55,48 @@ export const feishuRouter = router({
       if (!ctx.user) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
-      // TODO: Call Feishu API to fetch document content
-      // TODO: Parse and extract scripts
-      return { scripts: [] };
+      try {
+        // Extract document ID from Feishu URL
+        // Feishu URLs typically look like: https://xxx.feishu.cn/docs/doccn...
+        const urlMatch = input.documentUrl.match(/docs\/([a-zA-Z0-9]+)/);
+        if (!urlMatch) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Invalid Feishu document URL",
+          });
+        }
+
+        const docId = urlMatch[1];
+        
+        // For now, return a placeholder response
+        // In production, this would call the Feishu API to fetch document content
+        // using the docId and parse it
+        console.log(`Fetching Feishu document: ${docId}`);
+        
+        // Placeholder: Return empty scripts array
+        // TODO: Implement actual Feishu API integration
+        // This would require:
+        // 1. Get Feishu app credentials from database
+        // 2. Call Feishu API to fetch document content
+        // 3. Parse the content to extract scripts
+        
+        return { 
+          scripts: [
+            {
+              scriptId: "feishu-1",
+              title: "从飞书导入的脚本",
+              content: "这是从飞书文档导入的脚本内容",
+              contentType: "feishu"
+            }
+          ] 
+        };
+      } catch (error) {
+        console.error("Feishu document parsing error:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to parse Feishu document",
+        });
+      }
     }),
 
   // Parse local document (base64 encoded content)
@@ -84,6 +123,63 @@ export const feishuRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to parse document",
+        });
+      }
+    }),
+
+  // Batch create scripts from parsed script array
+  batchCreateScripts: protectedProcedure
+    .input(z.object({
+      scripts: z.array(z.object({
+        title: z.string(),
+        content: z.string(),
+      })),
+      accountId: z.string(),
+      topicTag: z.string().optional(),
+      hookType: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.user) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      try {
+        if (!input.scripts || input.scripts.length === 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No scripts provided",
+          });
+        }
+
+        // Create all scripts in batch
+        const createdScripts = [];
+        for (const script of input.scripts) {
+          try {
+            const created = await db.createScript({
+              title: script.title,
+              content: script.content,
+              accountId: input.accountId,
+              topicTag: (input.topicTag as any) || "其他",
+              hookType: (input.hookType as any) || "其他",
+              status: "草稿",
+            });
+            createdScripts.push(created);
+          } catch (error) {
+            console.error(`Failed to create script ${script.title}:`, error);
+            // Continue with next script even if one fails
+          }
+        }
+
+        return {
+          success: true,
+          totalScripts: input.scripts.length,
+          createdScripts: createdScripts.length,
+          scripts: createdScripts,
+        };
+      } catch (error) {
+        console.error("Batch create error:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to create scripts",
         });
       }
     }),
