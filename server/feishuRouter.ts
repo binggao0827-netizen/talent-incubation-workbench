@@ -57,23 +57,48 @@ export const feishuRouter = router({
       }
       try {
         // Extract document ID from Feishu URL
-        // Feishu URLs typically look like: https://xxx.feishu.cn/docs/doccn...
-        const urlMatch = input.documentUrl.match(/docs\/([a-zA-Z0-9]+)/);
-        if (!urlMatch) {
+        // Feishu URLs can be in multiple formats:
+        // - https://xxx.feishu.cn/docs/doccn...
+        // - https://xxx.feishu.cn/wiki/VTWewebNUit3wfkUMZqcPgXPnyh
+        // - https://xxx.feishu.cn/base/appXXX
+        
+        // Try to match docs format first
+        let urlMatch = input.documentUrl.match(/docs\/([a-zA-Z0-9]+)/);
+        let docId = urlMatch?.[1];
+        
+        // If not docs format, try wiki format
+        if (!docId) {
+          urlMatch = input.documentUrl.match(/wiki\/([a-zA-Z0-9]+)/);
+          docId = urlMatch?.[1];
+        }
+        
+        // If still no match, try base format
+        if (!docId) {
+          urlMatch = input.documentUrl.match(/base\/([a-zA-Z0-9]+)/);
+          docId = urlMatch?.[1];
+        }
+        
+        // If still no match, try to extract from pathname
+        if (!docId) {
+          const urlObj = new URL(input.documentUrl);
+          const pathSegments = urlObj.pathname.split("/").filter(s => s);
+          if (pathSegments.length >= 2) {
+            docId = pathSegments[pathSegments.length - 1];
+          }
+        }
+        
+        if (!docId) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Invalid Feishu document URL",
+            message: "Invalid Feishu document URL format. Supported formats: docs, wiki, base",
           });
         }
 
-        const docId = urlMatch[1];
+        console.log(`Fetching Feishu document: ${docId} from URL: ${input.documentUrl}`);
         
         // For now, return a placeholder response
         // In production, this would call the Feishu API to fetch document content
         // using the docId and parse it
-        console.log(`Fetching Feishu document: ${docId}`);
-        
-        // Placeholder: Return empty scripts array
         // TODO: Implement actual Feishu API integration
         // This would require:
         // 1. Get Feishu app credentials from database
