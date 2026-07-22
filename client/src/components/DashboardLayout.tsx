@@ -20,7 +20,7 @@ import {
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, BookOpen, Sparkles, Tag, Settings, TrendingUp } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, BookOpen, Sparkles, Tag, Settings, TrendingUp, Clock } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -39,6 +39,7 @@ const menuItems = [
 const adminMenuItems = [
   { icon: Users, label: "创作者管理", path: "/creators" },
   { icon: Tag, label: "内容类型", path: "/content-types" },
+  { icon: Clock, label: "定时任务", path: "/scheduled-tasks" },
   { icon: Settings, label: "飞书集成", path: "/settings/feishu" },
 ];
 

@@ -19,6 +19,7 @@ import CreatorsList from "./pages/CreatorsList";
 import ContentTypesList from "./pages/ContentTypesList";
 import { FeishuSettings } from "./pages/FeishuSettings";
 import { TrendingDashboard } from "./pages/TrendingDashboard";
+import { ScheduledTasks } from "./pages/ScheduledTasks";
 
 function Router() {
   return (
@@ -110,6 +111,15 @@ function Router() {
         {() => (
           <DashboardLayout>
             <TrendingDashboard />
+          </DashboardLayout>
+        )}
+      </Route>
+
+      {/* Scheduled Tasks route */}
+      <Route path={"/scheduled-tasks"}>
+        {() => (
+          <DashboardLayout>
+            <ScheduledTasks />
           </DashboardLayout>
         )}
       </Route>

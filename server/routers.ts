@@ -8,6 +8,7 @@ import { TRPCError } from "@trpc/server";
 import * as ai from "./ai";
 import { feishuRouter } from "./feishuRouter";
 import { trendingRouter } from "./trendingRouter";
+import { createHeartbeatJob, listHeartbeatJobs, updateHeartbeatJob, deleteHeartbeatJob } from "./_core/heartbeat";
 
 // Helper to check if user is admin
 function isAdmin(userRole?: string): boolean {
@@ -552,6 +553,96 @@ export const appRouter = router({
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: "Failed to generate topic ideas",
+          });
+        }
+      }),
+  }),
+
+  // ========== Heartbeat (Scheduled Tasks) Router ==========
+  heartbeat: router({
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1, "Task name is required"),
+        cron: z.string().min(1, "Cron expression is required"),
+        path: z.string().startsWith("/api/scheduled/", "Path must start with /api/scheduled/"),
+        method: z.enum(["POST", "PUT"]).optional(),
+        payload: z.any().optional(),
+        description: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can create scheduled tasks" });
+        }
+        try {
+          const result = await createHeartbeatJob(input, "");
+          return { success: true, taskUid: result.taskUid, nextExecutionAt: result.nextExecutionAt };
+        } catch (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: error instanceof Error ? error.message : "Failed to create heartbeat job",
+          });
+        }
+      }),
+
+    list: protectedProcedure
+      .input(z.object({
+        page: z.number().optional(),
+        pageSize: z.number().optional(),
+      }).optional())
+      .query(async ({ input, ctx }) => {
+        if (ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can list scheduled tasks" });
+        }
+        try {
+          const result = await listHeartbeatJobs("", input);
+          return result;
+        } catch (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: error instanceof Error ? error.message : "Failed to list heartbeat jobs",
+          });
+        }
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        taskUid: z.string().min(1, "Task UID is required"),
+        cron: z.string().optional(),
+        path: z.string().optional(),
+        method: z.enum(["POST", "PUT"]).optional(),
+        payload: z.any().optional(),
+        description: z.string().optional(),
+        enable: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can update scheduled tasks" });
+        }
+        try {
+          const { taskUid, ...patch } = input;
+          const result = await updateHeartbeatJob(taskUid, patch, "");
+          return { success: true, nextExecutionAt: result.nextExecutionAt };
+        } catch (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: error instanceof Error ? error.message : "Failed to update heartbeat job",
+          });
+        }
+      }),
+
+    delete: protectedProcedure
+      .input(z.string())
+      .mutation(async ({ input: taskUid, ctx }) => {
+        if (ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can delete scheduled tasks" });
+        }
+        try {
+          await deleteHeartbeatJob(taskUid, "");
+          return { success: true };
+        } catch (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: error instanceof Error ? error.message : "Failed to delete heartbeat job",
           });
         }
       }),
