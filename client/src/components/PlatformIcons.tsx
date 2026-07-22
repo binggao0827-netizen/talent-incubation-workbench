@@ -22,10 +22,10 @@ const sizeMap = {
  */
 export function PlatformIconImage({ platform, size = "md", className = "" }: PlatformIconProps) {
   const iconMap: Record<Platform, string> = {
-    "抖音": "/manus-storage/douyin-icon_9a5cba6b.png",
-    "微博": "/manus-storage/weibo-icon_f089996f.png",
-    "视频号": "/manus-storage/videonumber-icon_e73440de.png",
-    "小红书": "/manus-storage/xiaohongshu-icon_b98ead83.png",
+    "抖音": "/manus-storage/douyin-icon-bordered_b0a077d1.png",
+    "微博": "/manus-storage/weibo-icon-bordered_88e890c1.png",
+    "视频号": "/manus-storage/videonumber-icon-bordered_2252cc49.png",
+    "小红书": "/manus-storage/xiaohongshu-icon-bordered_482c0367.png",
   };
 
   const sizeClasses = sizeMap[size];

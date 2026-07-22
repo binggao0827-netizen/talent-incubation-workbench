@@ -207,12 +207,8 @@ export function TrendingDashboard() {
                 {AVAILABLE_PLATFORMS.map((platformValue) => {
                   const p = PLATFORMS.find(pl => pl.value === platformValue);
                   if (!p) return null;
-                  const colors = platformColorMap[p.value];
                   return (
-                    <TabsTrigger key={p.value} value={p.value} className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                      <div className={`${colors.bg} ${colors.text} rounded p-1`}>
-                        <PlatformIcon platform={p.value} size="sm" />
-                      </div>
+                    <TabsTrigger key={p.value} value={p.value} className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
                       {p.label}
                     </TabsTrigger>
                   );
