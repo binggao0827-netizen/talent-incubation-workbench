@@ -144,14 +144,15 @@ function DashboardLayoutContent({
   return (
     <>
       <Sidebar ref={resizeRef}>
-        <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center" style={{display: 'none'}}>
-              <span className="text-primary-foreground font-semibold text-xs" style={{display: 'none'}}>M</span>
+        <SidebarHeader className="border-b border-sidebar-border px-4 py-6">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center" style={{display: 'none'}}>
+              <span className="text-primary-foreground font-bold text-sm" style={{display: 'none'}}>M</span>
             </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-sm leading-tight tracking-tight">美丽视线 Creator Hub</span>
-              <span className="text-[10px] text-muted-foreground leading-tight" style={{fontSize: '10px'}}>达人孵化工作台</span>
+            <div className="flex flex-col gap-1">
+              <span className="font-bold text-base leading-snug tracking-tight">美丽视线</span>
+              <span className="text-xs text-muted-foreground leading-snug">Creator Hub</span>
+              <span className="text-[11px] text-muted-foreground/70 leading-snug">达人孵化工作台</span>
             </div>
           </div>
         </SidebarHeader>
