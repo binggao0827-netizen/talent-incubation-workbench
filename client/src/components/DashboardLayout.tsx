@@ -143,7 +143,7 @@ function DashboardLayoutContent({
             </div>
             <div className="flex flex-col">
               <span className="font-semibold text-sm leading-tight tracking-tight">达人孵化工作台</span>
-              <span className="text-[10px] text-muted-foreground leading-tight" style={{fontSize: '16px'}}>MLSX Creator Hub</span>
+              <span className="text-[10px] text-muted-foreground leading-tight" style={{fontSize: '16px'}}>美丽视线 Creator Hub</span>
             </div>
           </div>
         </SidebarHeader>
