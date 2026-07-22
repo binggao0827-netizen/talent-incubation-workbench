@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { PageHeader, StatusDot, Tag } from "@/components/Meta";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
-import { useState } from "react";
-import { Plus, FileText } from "lucide-react";
+import { useState, useRef } from "react";
+import { Plus, FileText, Upload, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -40,15 +41,31 @@ const scriptFormSchema = z.object({
 
 type ScriptFormValues = z.infer<typeof scriptFormSchema>;
 
+interface ParsedScript {
+  scriptId: string;
+  title: string;
+  content: string;
+  contentType?: string;
+}
+
 export default function ScriptsList() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("manual");
   const [filters, setFilters] = useState({
     topicTag: "",
     status: "",
     search: "",
   });
+  
+  // Local upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [documentTitle, setDocumentTitle] = useState("");
+  const [parsedScripts, setParsedScripts] = useState<ParsedScript[]>([]);
+  const [isParsingFile, setIsParsingFile] = useState(false);
+  const [selectedScriptIndex, setSelectedScriptIndex] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: scripts, isLoading, refetch } = trpc.scripts.list.useQuery(
     filters.topicTag || filters.status || filters.search
@@ -62,6 +79,7 @@ export default function ScriptsList() {
 
   const { data: accounts } = trpc.accounts.list.useQuery({});
   const createMutation = trpc.scripts.create.useMutation();
+  const parseDocumentMutation = trpc.feishu.parseLocalDocument.useMutation();
 
   const form = useForm<ScriptFormValues>({
     resolver: zodResolver(scriptFormSchema),
@@ -69,6 +87,80 @@ export default function ScriptsList() {
       status: "草稿",
     },
   });
+
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = [".md", ".txt", ".docx"];
+    const fileExtension = "." + file.name.split(".").pop()?.toLowerCase();
+
+    if (!allowedTypes.includes(fileExtension)) {
+      toast.error("仅支持 .md、.txt、.docx 格式");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("文件大小不能超过 10MB");
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
+  // Handle file upload and parsing
+  const handleUploadAndParse = async () => {
+    if (!selectedFile || !documentTitle.trim()) {
+      toast.error("请选择文件并输入文档标题");
+      return;
+    }
+
+    setIsParsingFile(true);
+    try {
+      // Read file as base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const base64Content = (e.target?.result as string).split(",")[1] || "";
+          const fileExtension = selectedFile.name.split(".").pop()?.toLowerCase() as "md" | "txt" | "docx";
+
+          const result = await parseDocumentMutation.mutateAsync({
+            content: base64Content,
+            fileName: selectedFile.name,
+            fileType: fileExtension,
+            documentTitle: documentTitle,
+          });
+
+          if (result.scripts && result.scripts.length > 0) {
+            setParsedScripts(result.scripts);
+            setSelectedScriptIndex(0);
+            toast.success(`成功解析 ${result.scripts.length} 个脚本`);
+          } else {
+            toast.error("未能从文档中解析出脚本");
+          }
+        } catch (error) {
+          console.error("Parse error:", error);
+          toast.error("解析文档失败，请检查文件格式");
+        } finally {
+          setIsParsingFile(false);
+        }
+      };
+      reader.readAsDataURL(selectedFile);
+    } catch (error) {
+      console.error("File read error:", error);
+      toast.error("读取文件失败");
+      setIsParsingFile(false);
+    }
+  };
+
+  // Fill form with selected script
+  const handleSelectScript = (script: ParsedScript) => {
+    form.setValue("title", script.title);
+    form.setValue("content", script.content);
+    setActiveTab("manual");
+    toast.success("已填充脚本信息，请完成其他字段后提交");
+  };
 
   const onSubmit = async (data: ScriptFormValues) => {
     try {
@@ -99,15 +191,23 @@ export default function ScriptsList() {
               新增脚本
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-96 overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>新增脚本</DialogTitle>
               <DialogDescription>
-                填写脚本信息，系统将为您记录选题、钩子与内容。
+                手动创建或从本地文档导入脚本信息。
               </DialogDescription>
             </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="manual">手动创建</TabsTrigger>
+                <TabsTrigger value="upload">本地上传</TabsTrigger>
+              </TabsList>
+
+              {/* Manual Creation Tab */}
+              <TabsContent value="manual" className="space-y-4">
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="accountId"
@@ -230,13 +330,121 @@ export default function ScriptsList() {
                   )}
                 />
 
-                <div className="flex justify-end pt-2">
-                  <Button type="submit" disabled={createMutation.isPending}>
-                    {createMutation.isPending ? "创建中…" : "创建脚本"}
+                  <div className="flex justify-end pt-2">
+                    <Button type="submit" disabled={createMutation.isPending}>
+                      {createMutation.isPending ? "创建中…" : "创建脚本"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+              </TabsContent>
+
+              {/* Local Upload Tab */}
+              <TabsContent value="upload" className="space-y-4">
+                <div className="space-y-4">
+                  {/* Document Title Input */}
+                  <div>
+                    <Label htmlFor="doc-title">文档标题（用于提取月份）</Label>
+                    <Input
+                      id="doc-title"
+                      placeholder="例如：2026年5月脚本、5月"
+                      value={documentTitle}
+                      onChange={(e) => setDocumentTitle(e.target.value)}
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      标题中需要包含月份信息（如"5月"或"2026年5月"），系统将自动提取用于脚本编号
+                    </p>
+                  </div>
+
+                  {/* File Upload Area */}
+                  <div>
+                    <Label htmlFor="file-input">选择文件</Label>
+                    <div className="mt-1 border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent/50 transition-colors cursor-pointer"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        id="file-input"
+                        accept=".md,.txt,.docx"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                      <Upload className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                      <p className="text-sm font-medium">
+                        {selectedFile ? selectedFile.name : "点击选择或拖拽文件"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        支持 .md、.txt、.docx 格式，文件大小不超过 10MB
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Parse Button */}
+                  <Button
+                    onClick={handleUploadAndParse}
+                    disabled={!selectedFile || !documentTitle.trim() || isParsingFile || parseDocumentMutation.isPending}
+                    className="w-full"
+                  >
+                    {isParsingFile || parseDocumentMutation.isPending ? "解析中…" : "解析文档"}
                   </Button>
+
+                  {/* Parsed Scripts List */}
+                  {parsedScripts.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>解析结果（{parsedScripts.length} 个脚本）</Label>
+                      <div className="border border-border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                        {parsedScripts.map((script, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3 border-b border-border last:border-b-0 cursor-pointer transition-colors ${
+                              selectedScriptIndex === idx
+                                ? "bg-accent/20 border-l-2 border-l-accent"
+                                : "hover:bg-accent/10"
+                            }`}
+                            onClick={() => {
+                              setSelectedScriptIndex(idx);
+                              handleSelectScript(script);
+                            }}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium">{script.scriptId}: {script.title}</p>
+                                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{script.content}</p>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectScript(script);
+                                }}
+                              >
+                                使用
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error State */}
+                  {parseDocumentMutation.isError && (
+                    <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                      <AlertCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-destructive">解析失败</p>
+                        <p className="text-xs text-destructive/80 mt-0.5">
+                          {(parseDocumentMutation.error as any)?.message || "请检查文件格式是否正确"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </form>
-            </Form>
+              </TabsContent>
+            </Tabs>
           </DialogContent>
         </Dialog>
         }
