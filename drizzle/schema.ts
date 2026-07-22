@@ -186,7 +186,44 @@ export type Review = typeof reviews.$inferSelect;
 export type InsertReview = typeof reviews.$inferInsert;
 
 /**
- * 热点表（四期）
+ * 热榜项目表
+ * 存储各平台热榜数据
+ */
+export const trendingItems = mysqlTable("trending_items", {
+  id: varchar("id", { length: 36 }).primaryKey(), // UUID
+  platform: mysqlEnum("platform", ["抖音", "微博", "快手", "B站"]).notNull(), // 平台
+  rank: int("rank").notNull(), // 排名
+  title: text("title").notNull(), // 热榜标题
+  description: text("description"), // 描述
+  hotValue: int("hotValue").default(0), // 热度值
+  url: text("url"), // 链接
+  imageUrl: text("imageUrl"), // 图片 URL
+  category: varchar("category", { length: 100 }), // 分类
+  collectedAt: timestamp("collectedAt").defaultNow().notNull(), // 采集时间
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type TrendingItem = typeof trendingItems.$inferSelect;
+export type InsertTrendingItem = typeof trendingItems.$inferInsert;
+
+/**
+ * 热榜快照表
+ * 用于保存历史热榜数据，便于分析趋势
+ */
+export const trendingSnapshots = mysqlTable("trending_snapshots", {
+  id: varchar("id", { length: 36 }).primaryKey(), // UUID
+  platform: mysqlEnum("platform", ["抖音", "微博", "快手", "B站"]).notNull(), // 平台
+  snapshotDate: date("snapshotDate").notNull(), // 快照日期
+  data: text("data").notNull(), // JSON 格式的完整热榜数据
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type TrendingSnapshot = typeof trendingSnapshots.$inferSelect;
+export type InsertTrendingSnapshot = typeof trendingSnapshots.$inferInsert;
+
+/**
+ * 热点表（保留用于向后兼容）
  * 存储各平台热榜数据
  */
 export const hotTopics = mysqlTable("hot_topics", {

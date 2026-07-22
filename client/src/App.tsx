@@ -18,6 +18,7 @@ import AIFeatures from "./pages/AIFeatures";
 import CreatorsList from "./pages/CreatorsList";
 import ContentTypesList from "./pages/ContentTypesList";
 import { FeishuSettings } from "./pages/FeishuSettings";
+import { TrendingDashboard } from "./pages/TrendingDashboard";
 
 function Router() {
   return (
@@ -101,6 +102,15 @@ function Router() {
       <Route path={"/ai"}>
         {() => (
           <AIFeatures />
+        )}
+      </Route>
+
+      {/* Trending Dashboard route */}
+      <Route path={"/trending"}>
+        {() => (
+          <DashboardLayout>
+            <TrendingDashboard />
+          </DashboardLayout>
         )}
       </Route>
 

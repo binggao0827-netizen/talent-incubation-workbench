@@ -1,4 +1,3 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,10 +20,11 @@ import {
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, BookOpen, Sparkles, Tag, Settings } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, BookOpen, Sparkles, Tag, Settings, TrendingUp } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
+import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Button } from "./ui/button";
 
 const menuItems = [
@@ -32,6 +32,7 @@ const menuItems = [
   { icon: Users, label: "账号管理", path: "/accounts" },
   { icon: FileText, label: "脚本库", path: "/scripts" },
   { icon: BookOpen, label: "复盘库", path: "/reviews" },
+  { icon: TrendingUp, label: "热榜看板", path: "/trending" },
   { icon: Sparkles, label: "AI 智能", path: "/ai" },
 ];
 

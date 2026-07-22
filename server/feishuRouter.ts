@@ -38,29 +38,51 @@ async function getFeishuAccessToken(appId: string, appSecret: string): Promise<s
 // Helper function to get document content from Feishu API
 async function getFeishuDocumentContent(docId: string, accessToken: string): Promise<string> {
   try {
-    // Try to get document as markdown
-    const url = `https://open.feishu.cn/open-apis/doc/v2/${docId}/raw_content`;
-    console.log(`Fetching from Feishu API: ${url}`);
-    
-    const response = await fetch(url, {
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-      },
-    });
+    // Try multiple API endpoints to get document content
+    const endpoints = [
+      `https://open.feishu.cn/open-apis/doc/v2/${docId}/raw_content`,
+      `https://open.feishu.cn/open-apis/docs/v2/${docId}/raw_content`,
+    ];
 
-    console.log(`Feishu API response status: ${response.status}`);
+    let lastError: Error | null = null;
 
-    const data = await response.json() as any;
-    console.log(`Feishu API response:`, JSON.stringify(data).substring(0, 500));
-    
-    if (data.code !== 0) {
-      throw new Error(`Feishu API error: ${data.msg || data.code}`);
+    for (const url of endpoints) {
+      try {
+        console.log(`Trying Feishu API endpoint: ${url}`);
+        
+        const response = await fetch(url, {
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+          },
+        });
+
+        console.log(`Feishu API response status: ${response.status}`);
+
+        const data = await response.json() as any;
+        console.log(`Feishu API response:`, JSON.stringify(data).substring(0, 500));
+        
+        if (data.code === 0 && data.data?.content) {
+          const content = data.data.content;
+          console.log(`Document content length: ${content.length}`);
+          return content;
+        } else if (data.code !== 0) {
+          lastError = new Error(`API error (${data.code}): ${data.msg}`);
+          console.log(`Endpoint ${url} failed, trying next...`);
+          continue;
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.log(`Endpoint ${url} failed with error:`, lastError.message);
+        continue;
+      }
     }
 
-    // The content is returned as markdown
-    const content = data.data?.content || "";
-    console.log(`Document content length: ${content.length}`);
-    return content;
+    // If all endpoints failed, throw the last error
+    if (lastError) {
+      throw lastError;
+    }
+
+    throw new Error("No valid API endpoint returned document content");
   } catch (error) {
     console.error(`getFeishuDocumentContent error:`, error);
     throw new Error(`Failed to get document content: ${error instanceof Error ? error.message : "Unknown error"}`);
