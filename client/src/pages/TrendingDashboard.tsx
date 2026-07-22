@@ -8,16 +8,18 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { AlertCircle, RefreshCw, TrendingUp, Lock, Search, ArrowUpDown, X, Filter, ExternalLink } from "lucide-react";
+import { PlatformIcon, platformColorMap } from "@/components/PlatformIcons";
+import { TrendingImageCard } from "@/components/TrendingImageCard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 
 type Platform = "抖音" | "微博" | "快手" | "B站";
 
-const PLATFORMS: { value: Platform; label: string; color: string }[] = [
-  { value: "抖音", label: "抖音", color: "bg-black" },
-  { value: "微博", label: "微博", color: "bg-red-500" },
-  { value: "快手", label: "快手", color: "bg-yellow-500" },
-  { value: "B站", label: "B站", color: "bg-blue-500" },
+const PLATFORMS: { value: Platform; label: string }[] = [
+  { value: "抖音", label: "抖音" },
+  { value: "微博", label: "微博" },
+  { value: "快手", label: "快手" },
+  { value: "B站", label: "B站" },
 ];
 
 // 平台热榜链接
@@ -159,17 +161,18 @@ export function TrendingDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {PLATFORMS.map((platform) => {
           const count = allPlatformsData?.[platform.value]?.length || 0;
+          const colors = platformColorMap[platform.value];
           return (
-            <Card key={platform.value}>
+            <Card key={platform.value} className="hover:shadow-lg hover:border-pink-200 transition-all duration-200 cursor-pointer">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">{platform.label}</p>
-                    <p className="text-2xl font-bold mt-2">{count}</p>
-                    <p className="text-xs text-muted-foreground mt-1">热点话题数</p>
+                    <p className="text-3xl font-bold mt-2 text-foreground">{count}</p>
+                    <p className="text-xs text-muted-foreground mt-1">炭点话题数</p>
                   </div>
-                  <div className={`${platform.color} rounded-lg p-3`}>
-                    <TrendingUp className="h-6 w-6 text-white" />
+                  <div className={`${colors.bg} ${colors.text} rounded-xl p-4 shadow-md`}>
+                    <PlatformIcon platform={platform.value} size="lg" />
                   </div>
                 </div>
               </CardContent>
@@ -189,12 +192,18 @@ export function TrendingDashboard() {
               </CardDescription>
             </div>
             <Tabs value={selectedPlatform} onValueChange={(v) => setSelectedPlatform(v as Platform)}>
-              <TabsList>
-                {PLATFORMS.map((p) => (
-                  <TabsTrigger key={p.value} value={p.value}>
-                    {p.label}
-                  </TabsTrigger>
-                ))}
+              <TabsList className="bg-muted">
+                {PLATFORMS.map((p) => {
+                  const colors = platformColorMap[p.value];
+                  return (
+                    <TabsTrigger key={p.value} value={p.value} className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                      <div className={`${colors.bg} ${colors.text} rounded p-1`}>
+                        <PlatformIcon platform={p.value} size="sm" />
+                      </div>
+                      {p.label}
+                    </TabsTrigger>
+                  );
+                })}
               </TabsList>
             </Tabs>
           </div>
@@ -287,8 +296,8 @@ export function TrendingDashboard() {
               <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-muted rounded-lg font-semibold text-sm">
                 <div className="col-span-1">排名</div>
                 <div className="col-span-1">封面</div>
-                <div className="col-span-5">炭点标题</div>
-                <div className="col-span-2">炭度</div>
+                <div className="col-span-5">热点标题</div>
+                <div className="col-span-2">热度</div>
                 <div className="col-span-2">视频数</div>
                 <div className="col-span-1">操作</div>
               </div>
@@ -313,20 +322,7 @@ export function TrendingDashboard() {
 
                   {/* 封面 */}
                   <div className="col-span-1">
-                    {item.imageUrl ? (
-                      <img
-                        src={item.imageUrl}
-                        alt={item.title}
-                        className="w-12 h-12 rounded object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
+                    <TrendingImageCard src={item.imageUrl} alt={item.title} size="md" />
                   </div>
 
                   {/* 标题和分类 */}
@@ -389,20 +385,7 @@ export function TrendingDashboard() {
                     </div>
                     {/* 封面 */}
                     <div className="flex-shrink-0">
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.title}
-                          className="w-12 h-12 rounded object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
-                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
+                      <TrendingImageCard src={item.imageUrl} alt={item.title} size="md" />
                     </div>
                     {/* 标题和炭度 */}
                     <div className="flex-1 min-w-0">

@@ -51,6 +51,35 @@ async function fetchTrendingData(platform: Platform): Promise<any[]> {
   }
 }
 
+/**
+ * 验证和规范化图片 URL
+ * - 处理相对 URL（添加 https 前缀）
+ * - 验证 URL 格式
+ * - 返回有效 URL 或空字符串
+ */
+function normalizeImageUrl(url: string | null | undefined): string {
+  if (!url || typeof url !== "string") return "";
+  
+  url = url.trim();
+  if (!url) return "";
+  
+  try {
+    // 如果是相对 URL，添加 https 前缀
+    if (url.startsWith("//")) {
+      url = "https:" + url;
+    }
+    // 检查是否是有效的 HTTP(S) URL
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      return "";
+    }
+    // 验证 URL 格式
+    new URL(url);
+    return url;
+  } catch {
+    return "";
+  }
+}
+
 // 解析 API 返回的数据为标准格式
 function parseTrendingItem(item: any, platform: Platform, rank: number): any {
   let title = "";
@@ -65,9 +94,9 @@ function parseTrendingItem(item: any, platform: Platform, rank: number): any {
     title = item.word || item.title || "";
     description = item.word || "";
     hotValue = item.hot_value || 0;
-    // 从 word_cover 获取图片
+    // 从 word_cover 获取图片並规范化
     if (item.word_cover && item.word_cover.url_list && item.word_cover.url_list.length > 0) {
-      imageUrl = item.word_cover.url_list[0];
+      imageUrl = normalizeImageUrl(item.word_cover.url_list[0]);
     }
     // 根据 sentence_tag 判断分类
     const tagMap: Record<number, string> = {
@@ -98,9 +127,10 @@ function parseTrendingItem(item: any, platform: Platform, rank: number): any {
     if (item.url) url = item.url;
     if (item.link) url = item.link;
 
-    if (item.image) imageUrl = item.image;
-    if (item.pic) imageUrl = item.pic;
-    if (item.img) imageUrl = item.img;
+    // 规范化图片 URL
+    if (!imageUrl) imageUrl = normalizeImageUrl(item.image);
+    if (!imageUrl) imageUrl = normalizeImageUrl(item.pic);
+    if (!imageUrl) imageUrl = normalizeImageUrl(item.img);
 
     if (item.category) category = item.category;
     if (item.type) category = item.type;
