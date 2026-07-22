@@ -163,21 +163,20 @@ export default function ScriptDetail({ scriptId }: ScriptDetailProps) {
         </CardContent>
       </Card>
 
-      {/* Metrics Timeline */}
-      <Card className="shadow-none">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-sm font-medium">数据记录</CardTitle>
-            <CardDescription className="text-xs mt-1">发布后各阶段的数据表现</CardDescription>
-          </div>
-          <Dialog open={metricsOpen} onOpenChange={setMetricsOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="gap-1.5">
-                <Plus className="w-3.5 h-3.5" />
-                录入数据
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
+      {/* Data Entry CTA */}
+      <div className="flex items-center justify-between gap-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div>
+          <h3 className="font-medium text-sm text-blue-900">录入数据反馈</h3>
+          <p className="text-xs text-blue-700 mt-1">记录该脚本发布后的数据表现，追踪内容效果</p>
+        </div>
+        <Dialog open={metricsOpen} onOpenChange={setMetricsOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="gap-1.5 flex-shrink-0">
+              <Plus className="w-4 h-4" />
+              录入数据
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>录入数据反馈</DialogTitle>
                 <DialogDescription>
@@ -316,8 +315,15 @@ export default function ScriptDetail({ scriptId }: ScriptDetailProps) {
                   </div>
                 </form>
               </Form>
-            </DialogContent>
-          </Dialog>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Metrics Timeline */}
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">数据记录</CardTitle>
+          <CardDescription className="text-xs mt-1">发布后各阶段的数据表现</CardDescription>
         </CardHeader>
         <CardContent>
           {metrics && metrics.length > 0 ? (
