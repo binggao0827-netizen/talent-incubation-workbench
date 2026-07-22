@@ -104,13 +104,13 @@ export const feishuRouter = router({
         // 2. Call Feishu API to fetch document content (as markdown or html)
         // 3. Return the raw content for batchImportScripts to parse
         
-        const placeholderContent = `# 从飞书导入的脚本
+        // Placeholder content with proper format for parseDocument
+        // Format: 选题一：《标题》 followed by content
+        const placeholderContent = `选题一：《从飞书导入的脚本示例》
+这是从飞书文档导入的脚本内容。您可以在这里添加脚本的详细描述。
 
-## 脚本 1
-这是从飞书文档导入的脚本内容
-
-## 脚本 2
-另一个脚本例子`;
+选题二：《另一个脚本例子》
+这是第二个脚本的示例内容。可以包含多行文本和格式化内容。`;
         
         return { 
           content: Buffer.from(placeholderContent).toString('base64') // Return as base64 like local upload
