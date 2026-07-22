@@ -15,6 +15,8 @@ import ScriptDetail from "./pages/ScriptDetail";
 import ReviewsList from "./pages/ReviewsList";
 import Dashboard from "./pages/Dashboard";
 import AIFeatures from "./pages/AIFeatures";
+import CreatorsList from "./pages/CreatorsList";
+import ContentTypesList from "./pages/ContentTypesList";
 
 function Router() {
   return (
@@ -70,6 +72,24 @@ function Router() {
         {() => (
           <DashboardLayout>
             <ReviewsList />
+          </DashboardLayout>
+        )}
+      </Route>
+
+      {/* Creators routes */}
+      <Route path={"/creators"}>
+        {() => (
+          <DashboardLayout>
+            <CreatorsList />
+          </DashboardLayout>
+        )}
+      </Route>
+
+      {/* Content Types routes */}
+      <Route path={"/content-types"}>
+        {() => (
+          <DashboardLayout>
+            <ContentTypesList />
           </DashboardLayout>
         )}
       </Route>

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeAll } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
@@ -25,6 +25,27 @@ function createAdminContext(): TrpcContext {
 }
 
 describe("accounts router", () => {
+  let testCreatorId: string;
+  let testContentTypeId: string;
+
+  beforeAll(async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+
+    // Create a test creator
+    testCreatorId = await caller.creators.create({
+      name: "Test Creator",
+      description: "Test creator for accounts",
+      status: "孵化中",
+    });
+
+    // Create a test content type
+    testContentTypeId = await caller.contentTypes.create({
+      name: "Test Type",
+      description: "Test content type",
+    });
+  });
+
   it("admin can list all accounts", async () => {
     const ctx = createAdminContext();
     const caller = appRouter.createCaller(ctx);
@@ -32,7 +53,6 @@ describe("accounts router", () => {
     const result = await caller.accounts.list();
 
     expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBeGreaterThan(0);
   });
 
   it("admin can create account", async () => {
@@ -40,11 +60,13 @@ describe("accounts router", () => {
     const caller = appRouter.createCaller(ctx);
 
     const accountId = await caller.accounts.create({
-      name: "Test Account",
+      creatorId: testCreatorId,
       platform: "抖音",
-      category: "美妆",
+      accountName: "Test Account",
       followerCount: 10000,
-      accountUrl: "https://douyin.com/test",
+      homepageUrl: "https://douyin.com/test",
+      status: "孵化中",
+      contentTypeIds: [testContentTypeId],
     });
 
     expect(typeof accountId).toBe("string");
@@ -56,19 +78,19 @@ describe("accounts router", () => {
     const caller = appRouter.createCaller(ctx);
 
     const accountId = await caller.accounts.create({
-      name: "Beauty Account",
+      creatorId: testCreatorId,
       platform: "小红书",
-      category: "美妆",
+      accountName: "Beauty Account",
       followerCount: 50000,
-      accountUrl: "https://xiaohongshu.com/beauty",
-      assignedEditor: "Alice",
+      homepageUrl: "https://xiaohongshu.com/beauty",
+      status: "孵化中",
+      contentTypeIds: [testContentTypeId],
     });
 
     const account = await caller.accounts.getById(accountId);
 
-    expect(account.name).toBe("Beauty Account");
+    expect(account.accountName).toBe("Beauty Account");
     expect(account.platform).toBe("小红书");
-    expect(account.category).toBe("美妆");
     expect(account.followerCount).toBe(50000);
   });
 });

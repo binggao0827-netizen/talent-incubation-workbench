@@ -47,17 +47,16 @@ export default function AccountDetail({ accountId }: AccountDetailProps) {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight">{account.name}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{account.accountName}</h1>
               <StatusDot status={account.status || "孵化中"} />
             </div>
             <p className="text-sm text-muted-foreground mt-1.5">
-              {account.platform} · {account.category}
-              {account.assignedEditor && <> · 编导 {account.assignedEditor}</>}
+              {account.platform}
             </p>
           </div>
-          {account.accountUrl && (
+          {account.homepageUrl && (
             <a
-              href={account.accountUrl}
+              href={account.homepageUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 decoration-border transition-colors duration-150 pt-2"

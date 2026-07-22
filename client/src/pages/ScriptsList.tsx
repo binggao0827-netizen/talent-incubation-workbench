@@ -123,7 +123,7 @@ export default function ScriptsList() {
                         <SelectContent>
                           {accounts?.map((account) => (
                             <SelectItem key={account.id} value={account.id}>
-                              {account.name} ({account.platform})
+                              {account.accountName} ({account.platform})
                             </SelectItem>
                           ))}
                         </SelectContent>

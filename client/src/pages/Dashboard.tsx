@@ -238,9 +238,9 @@ export default function Dashboard() {
                       onClick={() => navigate(`/accounts/${account.id}`)}
                     >
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium truncate">{account.name}</h3>
+                        <h3 className="text-sm font-medium truncate">{account.accountName}</h3>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {account.platform} · {account.category}
+                          {account.platform}
                         </p>
                       </div>
                       <div className="text-right shrink-0">

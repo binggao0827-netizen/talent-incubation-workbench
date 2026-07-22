@@ -127,7 +127,7 @@ export default function ReviewsList() {
                         <SelectContent>
                           {accounts?.map((account) => (
                             <SelectItem key={account.id} value={account.id}>
-                              {account.name}
+                              {account.accountName} ({account.platform})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -244,7 +244,7 @@ export default function ReviewsList() {
                     </h3>
                     {review.aiGenerated && <Tag>AI 生成</Tag>}
                     {review.accountId && (
-                      <Tag>{accounts?.find(a => a.id === review.accountId)?.name}</Tag>
+                      <Tag>{accounts?.find(a => a.id === review.accountId)?.accountName}</Tag>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2 mt-2">{review.content}</p>

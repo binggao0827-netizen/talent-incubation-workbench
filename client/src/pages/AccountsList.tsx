@@ -1,37 +1,30 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
-import { PageHeader, StatusDot } from "@/components/Meta";
+import { useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useLocation } from "wouter";
-import { useState } from "react";
-import { Plus, Users } from "lucide-react";
+import { PageHeader } from "@/components/Meta";
+import { StatusDot } from "@/components/Meta";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Plus, Users, ArrowUpRight } from "lucide-react";
 
 const accountFormSchema = z.object({
-  name: z.string().min(1, "账号名称不能为空"),
+  creatorId: z.string().min(1, "请选择创作者"),
   platform: z.enum(["抖音", "小红书", "B站", "视频号"]),
-  category: z.enum(["美妆", "游戏", "剧情", "测评", "教程", "种草", "生活", "其他"]),
-  accountUrl: z.string().optional(),
+  accountName: z.string().min(1, "账号名称不能为空"),
+  homepageUrl: z.string().url().optional().or(z.literal("")),
   followerCount: z.number().optional(),
   status: z.enum(["孵化中", "成熟", "暂停"]).optional(),
-  assignedEditor: z.string().optional(),
+  contentTypeIds: z.string().array().optional(),
 });
 
 type AccountFormValues = z.infer<typeof accountFormSchema>;
@@ -42,6 +35,8 @@ export default function AccountsList() {
   const [open, setOpen] = useState(false);
 
   const { data: accounts, isLoading, refetch } = trpc.accounts.list.useQuery({});
+  const { data: creators } = trpc.creators.list.useQuery();
+  const { data: contentTypes } = trpc.contentTypes.list.useQuery();
   const createMutation = trpc.accounts.create.useMutation();
 
   const form = useForm<AccountFormValues>({
@@ -80,7 +75,7 @@ export default function AccountsList() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="账号管理"
         description="管理达人账号，追踪粉丝增长与内容表现"
@@ -97,20 +92,31 @@ export default function AccountsList() {
               <DialogHeader>
                 <DialogTitle>新增账号</DialogTitle>
                 <DialogDescription>
-                  填写达人账号信息，系统将为您管理该账号的所有脚本和数据。
+                  填写平台账号信息，系统将为您管理该账号的所有脚本和数据。
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="name"
+                    name="creatorId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>账号名称</FormLabel>
-                        <FormControl>
-                          <Input placeholder="输入达人名或账号名" {...field} />
-                        </FormControl>
+                        <FormLabel>创作者</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="选择创作者" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {creators?.map((creator) => (
+                              <SelectItem key={creator.id} value={creator.id}>
+                                {creator.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -142,27 +148,27 @@ export default function AccountsList() {
 
                   <FormField
                     control={form.control}
-                    name="category"
+                    name="accountName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>领域分类</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="选择领域" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="美妆">美妆</SelectItem>
-                            <SelectItem value="游戏">游戏</SelectItem>
-                            <SelectItem value="剧情">剧情</SelectItem>
-                            <SelectItem value="测评">测评</SelectItem>
-                            <SelectItem value="教程">教程</SelectItem>
-                            <SelectItem value="种草">种草</SelectItem>
-                            <SelectItem value="生活">生活</SelectItem>
-                            <SelectItem value="其他">其他</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>账号名称</FormLabel>
+                        <FormControl>
+                          <Input placeholder="输入平台账号名" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="homepageUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>主页链接</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://..." {...field} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -182,6 +188,38 @@ export default function AccountsList() {
                             onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                           />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="contentTypeIds"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>内容类型</FormLabel>
+                        <Select onValueChange={(val) => {
+                          const current = field.value || [];
+                          if (current.includes(val)) {
+                            field.onChange(current.filter(id => id !== val));
+                          } else {
+                            field.onChange([...current, val]);
+                          }
+                        }}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="选择内容类型（可多选）" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {contentTypes?.map((type) => (
+                              <SelectItem key={type.id} value={type.id}>
+                                {type.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -246,10 +284,10 @@ export default function AccountsList() {
                     </div>
                     <div className="min-w-0">
                       <CardTitle className="text-base truncate group-hover:underline underline-offset-4 decoration-border">
-                        {account.name}
+                        {account.accountName}
                       </CardTitle>
                       <CardDescription className="text-xs mt-0.5">
-                        {account.platform} · {account.category}
+                        {account.platform}
                       </CardDescription>
                     </div>
                   </div>
@@ -264,10 +302,16 @@ export default function AccountsList() {
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-1.5">粉丝</p>
                   </div>
-                  {account.assignedEditor && (
-                    <p className="text-xs text-muted-foreground pt-3">
-                      编导：{account.assignedEditor}
-                    </p>
+                  {account.homepageUrl && (
+                    <a
+                      href={account.homepageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 decoration-border transition-colors duration-150 pt-3"
+                    >
+                      主页 <ArrowUpRight className="w-2.5 h-2.5 inline" />
+                    </a>
                   )}
                 </div>
               </CardContent>
@@ -277,10 +321,7 @@ export default function AccountsList() {
       ) : (
         <div className="text-center py-16 border border-dashed border-border rounded-lg">
           <Users className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" strokeWidth={1.5} />
-          <p className="text-sm text-muted-foreground mb-4">还没有账号，点击“新增账号”开始</p>
-          {user.role === "admin" && (
-            <Button variant="outline" size="sm" onClick={() => setOpen(true)}>新增账号</Button>
-          )}
+          <p className="text-sm text-muted-foreground mb-4">还没有账号，点击"新增账号"开始</p>
         </div>
       )}
     </div>

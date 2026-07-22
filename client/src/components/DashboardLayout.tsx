@@ -21,7 +21,7 @@ import {
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, BookOpen, Sparkles } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, BookOpen, Sparkles, Tag } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -33,6 +33,11 @@ const menuItems = [
   { icon: FileText, label: "脚本库", path: "/scripts" },
   { icon: BookOpen, label: "复盘库", path: "/reviews" },
   { icon: Sparkles, label: "AI 智能", path: "/ai" },
+];
+
+const adminMenuItems = [
+  { icon: Users, label: "创作者管理", path: "/creators" },
+  { icon: Tag, label: "内容类型", path: "/content-types" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -169,6 +174,32 @@ function DashboardLayoutContent({
               );
             })}
           </SidebarMenu>
+          
+          {user?.role === "admin" && (
+            <>
+              <div className="my-2 border-t border-sidebar-border" />
+              <SidebarMenu className="gap-0.5">
+                {adminMenuItems.map((item) => {
+                  const isActive = location === item.path || location.startsWith(item.path + "/");
+                  return (
+                    <SidebarMenuItem key={item.path}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        onClick={() => navigate(item.path)}
+                      >
+                        <a href={item.path} className="cursor-pointer">
+                          <item.icon className="w-4 h-4" strokeWidth={1.75} />
+                          <span className="flex-1">{item.label}</span>
+                          {isActive && <span className="rec-dot rec-dot-live" aria-hidden="true" />}
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </>
+          )}
         </SidebarContent>
 
         <SidebarFooter className="border-t border-sidebar-border p-3">
@@ -205,7 +236,7 @@ function DashboardLayoutContent({
             <span className="text-muted-foreground">工作台</span>
             <span className="text-muted-foreground/50">/</span>
             <span className="font-medium">
-              {menuItems.find((m) => location === m.path || location.startsWith(m.path + "/"))?.label || "概览"}
+              {(menuItems.concat(adminMenuItems)).find((m) => location === m.path || location.startsWith(m.path + "/"))?.label || "概览"}
             </span>
           </div>
         </div>

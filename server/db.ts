@@ -1,6 +1,6 @@
 import { eq, and, like, desc, asc, sql, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, accounts, scripts, metrics, reviews, hotTopics } from "../drizzle/schema";
+import { InsertUser, users, creators, accounts, contentTypes, accountContentTypes, scripts, metrics, reviews, hotTopics } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { nanoid } from 'nanoid';
 
@@ -90,16 +90,167 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+// ========== Creators Queries ==========
+
+export async function createCreator(data: {
+  name: string;
+  description?: string;
+  avatar?: string;
+  assignedEditor?: string;
+  status?: "孵化中" | "成熟" | "暂停";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = nanoid();
+  await db.insert(creators).values({
+    id,
+    ...data,
+  });
+  return id;
+}
+
+export async function getCreators(filters?: {
+  status?: string;
+  search?: string;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (filters?.status) {
+    conditions.push(eq(creators.status, filters.status as any));
+  }
+  if (filters?.search) {
+    conditions.push(like(creators.name, `%${filters.search}%`));
+  }
+
+  if (conditions.length > 0) {
+    return db.select().from(creators).where(and(...conditions)).orderBy(desc(creators.createdAt));
+  }
+
+  return db.select().from(creators).orderBy(desc(creators.createdAt));
+}
+
+export async function getCreatorById(id: string) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select().from(creators).where(eq(creators.id, id)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function updateCreator(id: string, data: Partial<typeof creators.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(creators).set(data).where(eq(creators.id, id));
+}
+
+export async function deleteCreator(id: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(creators).where(eq(creators.id, id));
+}
+
+// ========== Content Types Queries ==========
+
+export async function createContentType(data: {
+  name: string;
+  description?: string;
+  color?: string;
+  isDefault?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = nanoid();
+  await db.insert(contentTypes).values({
+    id,
+    ...data,
+  });
+  return id;
+}
+
+export async function getContentTypes() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(contentTypes).orderBy(asc(contentTypes.name));
+}
+
+export async function getContentTypeById(id: string) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select().from(contentTypes).where(eq(contentTypes.id, id)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function updateContentType(id: string, data: Partial<typeof contentTypes.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(contentTypes).set(data).where(eq(contentTypes.id, id));
+}
+
+export async function deleteContentType(id: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(contentTypes).where(eq(contentTypes.id, id));
+}
+
+// ========== Account Content Types Queries ==========
+
+export async function addContentTypeToAccount(accountId: string, contentTypeId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = nanoid();
+  await db.insert(accountContentTypes).values({
+    id,
+    accountId,
+    contentTypeId,
+  });
+}
+
+export async function getAccountContentTypes(accountId: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const relations = await db.select().from(accountContentTypes).where(eq(accountContentTypes.accountId, accountId));
+  const typeIds = relations.map(r => r.contentTypeId);
+  
+  if (typeIds.length === 0) return [];
+  
+  return db.select().from(contentTypes).where(
+    sql`${contentTypes.id} IN (${typeIds.join(',')})`
+  );
+}
+
+export async function removeContentTypeFromAccount(accountId: string, contentTypeId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(accountContentTypes).where(
+    and(
+      eq(accountContentTypes.accountId, accountId),
+      eq(accountContentTypes.contentTypeId, contentTypeId)
+    )
+  );
+}
+
 // ========== Accounts Queries ==========
 
 export async function createAccount(data: {
-  name: string;
+  creatorId: string;
   platform: "抖音" | "小红书" | "B站" | "视频号";
-  accountUrl?: string;
-  category: "美妆" | "游戏" | "剧情" | "测评" | "教程" | "种草" | "生活" | "其他";
+  accountName: string;
+  homepageUrl?: string;
   followerCount?: number;
   status?: "孵化中" | "成熟" | "暂停";
-  assignedEditor?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -113,6 +264,7 @@ export async function createAccount(data: {
 }
 
 export async function getAccounts(filters?: {
+  creatorId?: string;
   platform?: string;
   status?: string;
   search?: string;
@@ -121,6 +273,9 @@ export async function getAccounts(filters?: {
   if (!db) return [];
 
   const conditions = [];
+  if (filters?.creatorId) {
+    conditions.push(eq(accounts.creatorId, filters.creatorId));
+  }
   if (filters?.platform) {
     conditions.push(eq(accounts.platform, filters.platform as any));
   }
@@ -128,7 +283,7 @@ export async function getAccounts(filters?: {
     conditions.push(eq(accounts.status, filters.status as any));
   }
   if (filters?.search) {
-    conditions.push(like(accounts.name, `%${filters.search}%`));
+    conditions.push(like(accounts.accountName, `%${filters.search}%`));
   }
 
   if (conditions.length > 0) {

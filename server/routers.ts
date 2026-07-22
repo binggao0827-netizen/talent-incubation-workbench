@@ -25,10 +25,79 @@ export const appRouter = router({
     }),
   }),
 
+  // ========== Creators Router ==========
+  creators: router({
+    list: protectedProcedure
+      .input(z.object({
+        status: z.string().optional(),
+        search: z.string().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        return db.getCreators(input);
+      }),
+
+    getById: protectedProcedure
+      .input(z.string())
+      .query(async ({ input }) => {
+        const creator = await db.getCreatorById(input);
+        if (!creator) {
+          throw new TRPCError({ code: "NOT_FOUND" });
+        }
+        // Get all accounts for this creator
+        const accounts = await db.getAccounts({ creatorId: input });
+        return { ...creator, accounts };
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        avatar: z.string().optional(),
+        assignedEditor: z.string().optional(),
+        status: z.enum(["孵化中", "成熟", "暂停"]).default("孵化中"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (!isAdmin(ctx.user?.role)) {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        return db.createCreator(input);
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.string(),
+        data: z.object({
+          name: z.string().optional(),
+          description: z.string().optional(),
+          avatar: z.string().optional(),
+          assignedEditor: z.string().optional(),
+          status: z.enum(["孵化中", "成熟", "暂停"]).optional(),
+        }),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (!isAdmin(ctx.user?.role)) {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        await db.updateCreator(input.id, input.data);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.string())
+      .mutation(async ({ input, ctx }) => {
+        if (!isAdmin(ctx.user?.role)) {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        await db.deleteCreator(input);
+        return { success: true };
+      }),
+  }),
+
   // ========== Accounts Router ==========
   accounts: router({
     list: protectedProcedure
       .input(z.object({
+        creatorId: z.string().optional(),
         platform: z.string().optional(),
         status: z.string().optional(),
         search: z.string().optional(),
@@ -44,45 +113,68 @@ export const appRouter = router({
         if (!account) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
-        return account;
+        const contentTypes = await db.getAccountContentTypes(input);
+        return { ...account, contentTypes };
       }),
 
     create: protectedProcedure
       .input(z.object({
-        name: z.string(),
+        creatorId: z.string(),
         platform: z.enum(["抖音", "小红书", "B站", "视频号"]),
-        accountUrl: z.string().optional(),
-        category: z.enum(["美妆", "游戏", "剧情", "测评", "教程", "种草", "生活", "其他"]),
+        accountName: z.string(),
+        homepageUrl: z.string().optional(),
         followerCount: z.number().optional(),
-        status: z.enum(["孵化中", "成熟", "暂停"]).optional(),
-        assignedEditor: z.string().optional(),
+        status: z.enum(["孵化中", "成熟", "暂停"]).default("孵化中"),
+        contentTypeIds: z.string().array().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        // Only admin can create accounts
         if (!isAdmin(ctx.user?.role)) {
           throw new TRPCError({ code: "FORBIDDEN" });
         }
-        return db.createAccount(input);
+        const { contentTypeIds, ...accountData } = input;
+        const accountId = await db.createAccount(accountData);
+        
+        // Add content types if provided
+        if (contentTypeIds && contentTypeIds.length > 0) {
+          for (const typeId of contentTypeIds) {
+            await db.addContentTypeToAccount(accountId, typeId);
+          }
+        }
+        
+        return accountId;
       }),
 
     update: protectedProcedure
       .input(z.object({
         id: z.string(),
         data: z.object({
-          name: z.string().optional(),
-          platform: z.enum(["抖音", "小红书", "B站", "视频号"]).optional(),
-          accountUrl: z.string().optional(),
-          category: z.enum(["美妆", "游戏", "剧情", "测评", "教程", "种草", "生活", "其他"]).optional(),
+          accountName: z.string().optional(),
+          homepageUrl: z.string().optional(),
           followerCount: z.number().optional(),
           status: z.enum(["孵化中", "成熟", "暂停"]).optional(),
-          assignedEditor: z.string().optional(),
+          contentTypeIds: z.string().array().optional(),
         }),
       }))
       .mutation(async ({ input, ctx }) => {
         if (!isAdmin(ctx.user?.role)) {
           throw new TRPCError({ code: "FORBIDDEN" });
         }
-        await db.updateAccount(input.id, input.data);
+        const { contentTypeIds, ...updateData } = input.data;
+        await db.updateAccount(input.id, updateData);
+        
+        // Update content types if provided
+        if (contentTypeIds) {
+          // Clear existing content types
+          const existing = await db.getAccountContentTypes(input.id);
+          for (const type of existing) {
+            await db.removeContentTypeFromAccount(input.id, type.id);
+          }
+          // Add new ones
+          for (const typeId of contentTypeIds) {
+            await db.addContentTypeToAccount(input.id, typeId);
+          }
+        }
+        
         return { success: true };
       }),
 
@@ -93,6 +185,55 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN" });
         }
         await db.deleteAccount(input);
+        return { success: true };
+      }),
+  }),
+
+  // ========== Content Types Router ==========
+  contentTypes: router({
+    list: protectedProcedure
+      .query(async () => {
+        return db.getContentTypes();
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        color: z.string().optional(),
+        isDefault: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (!isAdmin(ctx.user?.role)) {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        return db.createContentType(input);
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.string(),
+        data: z.object({
+          name: z.string().optional(),
+          description: z.string().optional(),
+          color: z.string().optional(),
+        }),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (!isAdmin(ctx.user?.role)) {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        await db.updateContentType(input.id, input.data);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.string())
+      .mutation(async ({ input, ctx }) => {
+        if (!isAdmin(ctx.user?.role)) {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        await db.deleteContentType(input);
         return { success: true };
       }),
   }),

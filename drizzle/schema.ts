@@ -36,27 +36,35 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /**
- * 达人账号表
- * 存储各平台的达人账号信息
+ * 创作者表（IP 层）
+ * 代表一个真实的人或团队，可在多个平台有账号
+ */
+export const creators = mysqlTable("creators", {
+  id: varchar("id", { length: 36 }).primaryKey(), // UUID
+  name: text("name").notNull(), // 创作者名称（如「小美医生」）
+  description: text("description"), // 创作者描述
+  avatar: text("avatar"), // 头像 URL
+  assignedEditor: varchar("assignedEditor", { length: 255 }), // 负责编导
+  status: mysqlEnum("status", ["孵化中", "成熟", "暂停"]).default("孵化中"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Creator = typeof creators.$inferSelect;
+export type InsertCreator = typeof creators.$inferInsert;
+
+/**
+ * 平台账号表
+ * 代表一个创作者在某个平台的账号
  */
 export const accounts = mysqlTable("accounts", {
   id: varchar("id", { length: 36 }).primaryKey(), // UUID
-  name: text("name").notNull(), // 达人名/账号名
+  creatorId: varchar("creatorId", { length: 36 }).notNull(), // 关联创作者
   platform: mysqlEnum("platform", ["抖音", "小红书", "B站", "视频号"]).notNull(),
-  accountUrl: text("accountUrl"), // 主页链接
-  category: mysqlEnum("category", [
-    "美妆",
-    "游戏",
-    "剧情",
-    "测评",
-    "教程",
-    "种草",
-    "生活",
-    "其他",
-  ]).notNull(),
+  accountName: text("accountName").notNull(), // 该平台的账号名
+  homepageUrl: text("homepageUrl"), // 该平台的主页链接
   followerCount: int("followerCount").default(0), // 当前粉丝数
   status: mysqlEnum("status", ["孵化中", "成熟", "暂停"]).default("孵化中"),
-  assignedEditor: varchar("assignedEditor", { length: 255 }), // 负责编导
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -65,12 +73,44 @@ export type Account = typeof accounts.$inferSelect;
 export type InsertAccount = typeof accounts.$inferInsert;
 
 /**
+ * 内容类型表
+ * 支持自定义标签，管理员可增删改
+ */
+export const contentTypes = mysqlTable("content_types", {
+  id: varchar("id", { length: 36 }).primaryKey(), // UUID
+  name: text("name").notNull(), // 类型名称（如「口播」、「剧情」）
+  description: text("description"), // 类型描述
+  color: varchar("color", { length: 20 }), // 标签颜色（可选，用于前端展示）
+  isDefault: boolean("isDefault").default(false), // 是否为系统默认类型
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ContentType = typeof contentTypes.$inferSelect;
+export type InsertContentType = typeof contentTypes.$inferInsert;
+
+/**
+ * 账号-内容类型关联表
+ * 一个账号可对应多个内容类型
+ */
+export const accountContentTypes = mysqlTable("account_content_types", {
+  id: varchar("id", { length: 36 }).primaryKey(), // UUID
+  accountId: varchar("accountId", { length: 36 }).notNull(), // 账号 ID
+  contentTypeId: varchar("contentTypeId", { length: 36 }).notNull(), // 内容类型 ID
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AccountContentType = typeof accountContentTypes.$inferSelect;
+export type InsertAccountContentType = typeof accountContentTypes.$inferInsert;
+
+/**
  * 脚本表（系统核心）
  * script_id 是全系统的命门，所有数据都通过 script_id 关联
+ * 注意：accountId 现在关联的是平台账号，而非创作者
  */
 export const scripts = mysqlTable("scripts", {
   id: varchar("id", { length: 36 }).primaryKey(), // UUID
-  accountId: varchar("accountId", { length: 36 }).notNull(), // 关联账号
+  accountId: varchar("accountId", { length: 36 }).notNull(), // 关联平台账号
   title: text("title").notNull(), // 脚本标题
   topicTag: mysqlEnum("topicTag", [
     "剧情",
@@ -127,6 +167,7 @@ export type InsertMetric = typeof metrics.$inferInsert;
 /**
  * 复盘表
  * 按周沉淀工作总结
+ * 注意：accountId 现在关联的是平台账号
  */
 export const reviews = mysqlTable("reviews", {
   id: varchar("id", { length: 36 }).primaryKey(), // UUID
