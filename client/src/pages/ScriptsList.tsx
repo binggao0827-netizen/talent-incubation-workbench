@@ -588,19 +588,14 @@ export default function ScriptsList() {
               {scripts.map((script) => (
                 <div key={script.id} className="border border-border rounded-lg overflow-hidden">
                   {/* Script Card Header */}
-                  <div
-                    className="p-4 bg-card hover:bg-accent/5 transition-colors cursor-pointer"
-                    onClick={() => handleToggleEdit(script)}
-                  >
+                  <div className="p-4 bg-card hover:bg-accent/5 transition-colors">
                     <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => navigate(`/scripts/${script.id}`)}
+                      >
                         <div className="flex items-center gap-2">
                           <h3 className="font-medium text-base">{script.title}</h3>
-                          {expandedScriptId === script.id ? (
-                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                          )}
                         </div>
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{script.content}</p>
                         <div className="flex items-center gap-2 mt-3 flex-wrap">
@@ -609,8 +604,28 @@ export default function ScriptsList() {
                           {script.status && <StatusDot status={script.status} />}
                         </div>
                       </div>
-                      <div className="text-right text-sm text-muted-foreground flex-shrink-0">
-                        <p className="text-xs">{new Date(script.createdAt).toLocaleDateString()}</p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleEdit(script);
+                          }}
+                        >
+                          编辑
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMetricsScriptId(script.id);
+                          }}
+                        >
+                          <BarChart3 className="w-4 h-4 mr-1" />
+                          数据
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -722,43 +737,33 @@ export default function ScriptsList() {
                         />
                       </div>
 
-                      <div className="flex gap-2 justify-between">
+                      <div className="flex gap-2 justify-end">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setMetricsScriptId(script.id)}
+                          onClick={handleCancelEdit}
+                          disabled={isSavingEdit}
                         >
-                          <BarChart3 className="w-4 h-4 mr-1" />
-                          录入数据
+                          <X className="w-4 h-4 mr-1" />
+                          取消
                         </Button>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleCancelEdit}
-                            disabled={isSavingEdit}
-                          >
-                            <X className="w-4 h-4 mr-1" />
-                            取消
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={handleSaveEdit}
-                            disabled={isSavingEdit}
-                          >
-                            {isSavingEdit ? (
-                              <>
-                                <Spinner className="w-4 h-4 mr-1" />
-                                保存中…
-                              </>
-                            ) : (
-                              <>
-                                <Save className="w-4 h-4 mr-1" />
-                                保存
-                              </>
-                            )}
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveEdit}
+                          disabled={isSavingEdit}
+                        >
+                          {isSavingEdit ? (
+                            <>
+                              <Spinner className="w-4 h-4 mr-1" />
+                              保存中…
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-1" />
+                              保存
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   )}
