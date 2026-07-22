@@ -12,9 +12,9 @@ interface PlatformIconProps {
 }
 
 const sizeMap = {
-  sm: "w-4 h-4",
-  md: "w-6 h-6",
-  lg: "w-8 h-8",
+  sm: "w-5 h-5",
+  md: "w-8 h-8",
+  lg: "w-12 h-12",
 };
 
 /**
@@ -22,10 +22,10 @@ const sizeMap = {
  */
 export function PlatformIconImage({ platform, size = "md", className = "" }: PlatformIconProps) {
   const iconMap: Record<Platform, string> = {
-    "抖音": "/manus-storage/pasted_file_byGS84_image_d7736242.png",
-    "微博": "/manus-storage/pasted_file_fZsRTl_image_1878d08c.png",
-    "视频号": "/manus-storage/pasted_file_fS2QWB_image_467a4058.png",
-    "小红书": "/manus-storage/pasted_file_PoINYn_image_a6ef2882.png",
+    "抖音": "/manus-storage/douyin-icon_9a5cba6b.png",
+    "微博": "/manus-storage/weibo-icon_f089996f.png",
+    "视频号": "/manus-storage/videonumber-icon_e73440de.png",
+    "小红书": "/manus-storage/xiaohongshu-icon_b98ead83.png",
   };
 
   const sizeClasses = sizeMap[size];
@@ -34,7 +34,7 @@ export function PlatformIconImage({ platform, size = "md", className = "" }: Pla
     <img
       src={iconMap[platform]}
       alt={`${platform} icon`}
-      className={`${sizeClasses} rounded-lg object-cover ${className}`}
+      className={`${sizeClasses} object-contain ${className}`}
     />
   );
 }

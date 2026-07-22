@@ -208,7 +208,9 @@ export const trendingRouter = router({
           });
         }
 
-        const platforms: Platform[] = getPlatformsWithApi();
+        // 获取所有平台（包括没有 API 的）
+        const allPlatforms: Platform[] = ["抖音", "微博", "视频号", "小红书"];
+        const platformsWithApi = getPlatformsWithApi();
         const result: Record<Platform, any[]> = {
           "抖音": [],
           "微博": [],
@@ -216,14 +218,20 @@ export const trendingRouter = router({
           "小红书": [],
         };
 
-        for (const platform of platforms) {
-          const items = await database
-            .select()
-            .from(trendingItems)
-            .where(eq(trendingItems.platform, platform))
-            .orderBy(desc(trendingItems.collectedAt), desc(trendingItems.rank))
-            .limit(input.limit);
-          result[platform] = items;
+        for (const platform of allPlatforms) {
+          if (platformsWithApi.includes(platform)) {
+            // 有 API 的平台，从数据库获取数据
+            const items = await database
+              .select()
+              .from(trendingItems)
+              .where(eq(trendingItems.platform, platform))
+              .orderBy(desc(trendingItems.collectedAt), desc(trendingItems.rank))
+              .limit(input.limit);
+            result[platform] = items;
+          } else {
+            // 没有 API 的平台，返回空数组
+            result[platform] = [];
+          }
         }
 
         return result;

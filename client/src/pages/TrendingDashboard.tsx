@@ -22,8 +22,8 @@ const PLATFORMS: { value: Platform; label: string }[] = [
   { value: "小红书", label: "小红书" },
 ];
 
-// 仅显示有 API 的平台
-const AVAILABLE_PLATFORMS = getPlatformsWithApi();
+// 显示所有平台
+const AVAILABLE_PLATFORMS = PLATFORMS.map(p => p.value);
 
 // 平台热榜链接
 const PLATFORM_URLS: Record<Platform, string> = {
@@ -173,10 +173,16 @@ export function TrendingDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">{platform.label}</p>
-                    <p className="text-3xl font-bold mt-2 text-foreground">{count}</p>
-                    <p className="text-xs text-muted-foreground mt-1">炭点话题数</p>
+                    {getPlatformsWithApi().includes(platform.value) ? (
+                      <>
+                        <p className="text-3xl font-bold mt-2 text-foreground">{count}</p>
+                        <p className="text-xs text-muted-foreground mt-1">炭点话题数</p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground mt-2 italic">即将上线，敬请期待...</p>
+                    )}
                   </div>
-                  <div className={`${colors.bg} ${colors.text} rounded-xl p-4 shadow-md`}>
+                  <div className={`${colors.bg} ${colors.text} rounded-lg p-3 shadow-md`}>
                     <PlatformIcon platform={platform.value} size="lg" />
                   </div>
                 </div>
@@ -286,7 +292,13 @@ export function TrendingDashboard() {
           </div>
 
           {/* 热榜列表 - 卡片式表格 */}
-          {isLoading ? (
+          {!getPlatformsWithApi().includes(selectedPlatform) ? (
+            <div className="text-center py-16">
+              <TrendingUp className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium text-muted-foreground mb-2">即将上线，敬请期待</p>
+              <p className="text-sm text-muted-foreground">{selectedPlatform}的炭榜数据正在筹备中...</p>
+            </div>
+          ) : isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-24 w-full" />
