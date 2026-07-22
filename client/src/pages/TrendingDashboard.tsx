@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/Meta";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -142,24 +143,23 @@ export function TrendingDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* 头部 - 优化排版 */}
-      <div className="flex items-center justify-between pb-6 border-b border-border">
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">热榜看板</h1>
-          <p className="text-base text-muted-foreground">实时追踪多平台热点话题，助力内容选题</p>
-        </div>
-        {user?.role === "admin" && (
-          <Button
-            onClick={handleCollect}
-            disabled={refreshing || collectMutation.isPending}
-            size="lg"
-            className="whitespace-nowrap"
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            {refreshing ? "采集中..." : "刷新数据"}
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="热榜看板"
+        description="实时追踪多平台热点话题，助力内容选题"
+        actions={
+          user?.role === "admin" ? (
+            <Button
+              onClick={handleCollect}
+              disabled={refreshing || collectMutation.isPending}
+              size="lg"
+              className="whitespace-nowrap"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "采集中..." : "刷新数据"}
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* 平台概览卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

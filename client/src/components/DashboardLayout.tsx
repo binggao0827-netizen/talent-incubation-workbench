@@ -150,8 +150,7 @@ function DashboardLayoutContent({
               <span className="text-primary-foreground font-bold text-sm" style={{display: 'none'}}>M</span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="font-bold text-base leading-snug tracking-tight">美丽视线</span>
-              <span className="text-xs text-muted-foreground leading-snug">Creator Hub</span>
+              <span className="font-bold text-base leading-snug tracking-tight">美丽视线 Creator Hub</span>
               <span className="text-[11px] text-muted-foreground/70 leading-snug">达人孵化工作台</span>
             </div>
           </div>
