@@ -2,6 +2,7 @@ import { router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
+import { parseDocument } from "./documentParser";
 
 function isAdmin(userRole?: string): boolean {
   return userRole === "admin";
@@ -62,17 +63,28 @@ export const feishuRouter = router({
   // Parse local document (base64 encoded content)
   parseLocalDocument: protectedProcedure
     .input(z.object({
-      content: z.string(), // base64 encoded file content
+      content: z.string(),
       fileName: z.string(),
-      fileType: z.enum(["md", "txt", "docx", "pdf"]),
+      fileType: z.enum(["md", "txt", "docx"]),
       documentTitle: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (!ctx.user) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
-      // TODO: Parse document based on file type
-      // TODO: Extract scripts with format MM-NN
-      return { scripts: [] };
+      try {
+        const scripts = await parseDocument(
+          input.content,
+          input.fileType,
+          input.documentTitle
+        );
+        return { scripts };
+      } catch (error) {
+        console.error("Document parsing error:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to parse document",
+        });
+      }
     }),
 });

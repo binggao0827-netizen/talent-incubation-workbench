@@ -3,8 +3,6 @@ import { writeFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { randomBytes } from "crypto";
-// @ts-ignore - pdf-parse has complex module exports
-import pdfParse from "pdf-parse";
 import * as mammoth from "mammoth";
 
 export interface ParsedScript {
@@ -91,27 +89,14 @@ export async function parseDocx(buffer: Buffer, documentTitle: string): Promise<
   }
 }
 
-/**
- * Parse PDF content
- */
-export async function parsePdf(buffer: Buffer, documentTitle: string): Promise<ParsedScript[]> {
-  try {
-    const data = await pdfParse(buffer);
-    const content = data.text || "";
-    const monthPrefix = extractMonth(documentTitle);
-    return extractScripts(content, monthPrefix);
-  } catch (error) {
-    console.error("Failed to parse PDF:", error);
-    throw new Error("Failed to parse PDF file");
-  }
-}
+
 
 /**
  * Main parser function - dispatches to appropriate parser based on file type
  */
 export async function parseDocument(
   fileContent: string, // base64 encoded
-  fileType: "md" | "txt" | "docx" | "pdf",
+  fileType: "md" | "txt" | "docx",
   documentTitle: string
 ): Promise<ParsedScript[]> {
   try {
@@ -124,8 +109,6 @@ export async function parseDocument(
         return await parseMarkdown(buffer.toString("utf-8"), documentTitle);
       case "docx":
         return await parseDocx(buffer, documentTitle);
-      case "pdf":
-        return await parsePdf(buffer, documentTitle);
       default:
         throw new Error(`Unsupported file type: ${fileType}`);
     }
