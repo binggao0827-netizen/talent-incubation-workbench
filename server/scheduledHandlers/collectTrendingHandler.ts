@@ -6,15 +6,23 @@ import { eq, and, desc, lte } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 // 平台类型
-type Platform = "抖音" | "微博" | "快手" | "B站";
+type Platform = "抖音" | "微博" | "视频号" | "小红书";
 
-// 热榜 API 端点配置
-const TRENDING_APIS: Record<Platform, string> = {
+// 炭榜 API 端点配置
+// 仅配置有 API 的平台
+const TRENDING_APIS: Record<Platform, string | null> = {
   "抖音": "https://v2.xxapi.cn/api/douyinhot",
   "微博": "https://v2.xxapi.cn/api/weibohot",
-  "快手": "https://v2.xxapi.cn/api/kuaishouhot",
-  "B站": "https://v2.xxapi.cn/api/bilibilihot",
+  "视频号": null, // 暂无 API
+  "小红书": null, // 暂无 API
 };
+
+// 获取有 API 的平台列表
+function getPlatformsWithApi(): Platform[] {
+  return (Object.keys(TRENDING_APIS) as Platform[]).filter(
+    (platform) => TRENDING_APIS[platform] !== null
+  );
+}
 
 // 从 API 获取热榜数据
 async function fetchTrendingData(platform: Platform): Promise<any[]> {
@@ -155,12 +163,12 @@ export async function collectTrendingHandler(req: Request, res: Response) {
     console.log(`Starting trending data collection for task ${user.taskUid}`);
 
     // 采集所有平台的数据
-    const platforms: Platform[] = ["抖音", "微博", "快手", "B站"];
+    const platforms: Platform[] = getPlatformsWithApi();
     const results: Record<Platform, number> = {
       "抖音": 0,
       "微博": 0,
-      "快手": 0,
-      "B站": 0,
+      "视频号": 0,
+      "小红书": 0,
     };
 
     for (const platform of platforms) {

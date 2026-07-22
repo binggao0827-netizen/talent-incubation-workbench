@@ -29,6 +29,20 @@
       "when": 1784715692393,
       "tag": "0003_first_mephisto",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1784725365441,
+      "tag": "0004_rich_the_phantom",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1784725749695,
+      "tag": "0005_tidy_molecule_man",
+      "breakpoints": true
     }
   ]
 }

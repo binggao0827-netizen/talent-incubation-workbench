@@ -1,0 +1,1 @@
+ALTER TABLE `trending_snapshots` MODIFY COLUMN `platform` enum('抖音','微博','视频号','小红书') NOT NULL;

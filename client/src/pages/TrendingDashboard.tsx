@@ -8,26 +8,29 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { AlertCircle, RefreshCw, TrendingUp, Lock, Search, ArrowUpDown, X, Filter, ExternalLink } from "lucide-react";
-import { PlatformIcon, platformColorMap } from "@/components/PlatformIcons";
+import { PlatformIcon, platformColorMap, getPlatformsWithApi } from "@/components/PlatformIcons";
 import { TrendingImageCard } from "@/components/TrendingImageCard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 
-type Platform = "抖音" | "微博" | "快手" | "B站";
+type Platform = "抖音" | "微博" | "视频号" | "小红书";
 
 const PLATFORMS: { value: Platform; label: string }[] = [
   { value: "抖音", label: "抖音" },
   { value: "微博", label: "微博" },
-  { value: "快手", label: "快手" },
-  { value: "B站", label: "B站" },
+  { value: "视频号", label: "视频号" },
+  { value: "小红书", label: "小红书" },
 ];
+
+// 仅显示有 API 的平台
+const AVAILABLE_PLATFORMS = getPlatformsWithApi();
 
 // 平台热榜链接
 const PLATFORM_URLS: Record<Platform, string> = {
   "抖音": "https://www.douyin.com/search?keyword=%s&type=general",
   "微博": "https://s.weibo.com/weibo?q=%s",
-  "快手": "https://www.kuaishou.com/search?keyword=%s",
-  "B站": "https://search.bilibili.com/all?keyword=%s",
+  "视频号": "https://channels.weixin.qq.com/",
+  "小红书": "https://www.xiaohongshu.com/",
 };
 
 export function TrendingDashboard() {
@@ -159,7 +162,9 @@ export function TrendingDashboard() {
 
       {/* 平台概览卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {PLATFORMS.map((platform) => {
+        {AVAILABLE_PLATFORMS.map((platformValue) => {
+          const platform = PLATFORMS.find(p => p.value === platformValue);
+          if (!platform) return null;
           const count = allPlatformsData?.[platform.value]?.length || 0;
           const colors = platformColorMap[platform.value];
           return (
@@ -193,7 +198,9 @@ export function TrendingDashboard() {
             </div>
             <Tabs value={selectedPlatform} onValueChange={(v) => setSelectedPlatform(v as Platform)}>
               <TabsList className="bg-muted">
-                {PLATFORMS.map((p) => {
+                {AVAILABLE_PLATFORMS.map((platformValue) => {
+                  const p = PLATFORMS.find(pl => pl.value === platformValue);
+                  if (!p) return null;
                   const colors = platformColorMap[p.value];
                   return (
                     <TabsTrigger key={p.value} value={p.value} className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">

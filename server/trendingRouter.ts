@@ -7,15 +7,23 @@ import { trendingItems, trendingSnapshots } from "../drizzle/schema";
 import { eq, and, desc, lte, sql } from "drizzle-orm";
 
 // 平台类型
-type Platform = "抖音" | "微博" | "快手" | "B站";
+type Platform = "抖音" | "微博" | "视频号" | "小红书";
 
 // 热榜 API 端点配置
-const TRENDING_APIS: Record<Platform, string> = {
+// 仅配置有 API 的平台
+const TRENDING_APIS: Record<Platform, string | null> = {
   "抖音": "https://v2.xxapi.cn/api/douyinhot",
   "微博": "https://v2.xxapi.cn/api/weibohot",
-  "快手": "https://v2.xxapi.cn/api/kuaishouhot",
-  "B站": "https://v2.xxapi.cn/api/bilibilihot",
+  "视频号": null, // 暂无 API
+  "小红书": null, // 暂无 API
 };
+
+// 获取有 API 的平台列表
+function getPlatformsWithApi(): Platform[] {
+  return (Object.keys(TRENDING_APIS) as Platform[]).filter(
+    (platform) => TRENDING_APIS[platform] !== null
+  );
+}
 
 // 从 API 获取热榜数据
 async function fetchTrendingData(platform: Platform): Promise<any[]> {
@@ -154,7 +162,7 @@ export const trendingRouter = router({
   // 获取最新热榜数据
   getLatest: publicProcedure
     .input(z.object({
-      platform: z.enum(["抖音", "微博", "快手", "B站"]),
+      platform: z.enum(["抖音", "微博", "视频号", "小红书"]),
       limit: z.number().min(1).max(100).optional().default(30),
     }))
     .query(async ({ input }) => {
@@ -200,12 +208,12 @@ export const trendingRouter = router({
           });
         }
 
-        const platforms: Platform[] = ["抖音", "微博", "快手", "B站"];
+        const platforms: Platform[] = getPlatformsWithApi();
         const result: Record<Platform, any[]> = {
           "抖音": [],
           "微博": [],
-          "快手": [],
-          "B站": [],
+          "视频号": [],
+          "小红书": [],
         };
 
         for (const platform of platforms) {
@@ -231,7 +239,7 @@ export const trendingRouter = router({
   // 采集热榜数据（管理员操作）
   collectTrending: protectedProcedure
     .input(z.object({
-      platform: z.enum(["抖音", "微博", "快手", "B站"]),
+      platform: z.enum(["抖音", "微博", "视频号", "小红书"]),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user?.role !== "admin") {
@@ -304,12 +312,12 @@ export const trendingRouter = router({
         });
       }
 
-      const platforms: Platform[] = ["抖音", "微博", "快手", "B站"];
+      const platforms: Platform[] = getPlatformsWithApi();
       const stats: Record<Platform, number> = {
         "抖音": 0,
         "微博": 0,
-        "快手": 0,
-        "B站": 0,
+        "视频号": 0,
+        "小红书": 0,
       };
 
       for (const platform of platforms) {

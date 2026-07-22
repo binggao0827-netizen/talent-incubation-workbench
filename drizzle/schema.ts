@@ -191,7 +191,7 @@ export type InsertReview = typeof reviews.$inferInsert;
  */
 export const trendingItems = mysqlTable("trending_items", {
   id: varchar("id", { length: 36 }).primaryKey(), // UUID
-  platform: mysqlEnum("platform", ["抖音", "微博", "快手", "B站"]).notNull(), // 平台
+  platform: mysqlEnum("platform", ["抖音", "微博", "视频号", "小红书"]).notNull(), // 平台
   rank: int("rank").notNull(), // 排名
   title: text("title").notNull(), // 热榜标题
   description: text("description"), // 描述
@@ -213,7 +213,7 @@ export type InsertTrendingItem = typeof trendingItems.$inferInsert;
  */
 export const trendingSnapshots = mysqlTable("trending_snapshots", {
   id: varchar("id", { length: 36 }).primaryKey(), // UUID
-  platform: mysqlEnum("platform", ["抖音", "微博", "快手", "B站"]).notNull(), // 平台
+  platform: mysqlEnum("platform", ["抖音", "微博", "视频号", "小红书"]).notNull(), // 平台
   snapshotDate: date("snapshotDate").notNull(), // 快照日期
   data: text("data").notNull(), // JSON 格式的完整热榜数据
   createdAt: timestamp("createdAt").defaultNow().notNull(),
