@@ -35,7 +35,8 @@ async function fetchTrendingData(platform: Platform): Promise<any[]> {
     const data = await response.json() as any;
     
     // 根据不同平台处理数据格式
-    if (data.code !== 0) {
+    // API 返回 code: 200 表示成功，code: 0 也表示成功
+    if (data.code !== 0 && data.code !== 200) {
       throw new Error(`API error: ${data.msg || data.code}`);
     }
 
@@ -51,7 +52,6 @@ async function fetchTrendingData(platform: Platform): Promise<any[]> {
 }
 
 // 解析 API 返回的数据为标准格式
-// 根据 xxapi.cn 的实际返回格式调整
 function parseTrendingItem(item: any, platform: Platform, rank: number): any {
   let title = "";
   let description = "";
@@ -60,27 +60,51 @@ function parseTrendingItem(item: any, platform: Platform, rank: number): any {
   let imageUrl = "";
   let category = "";
 
-  // 处理不同平台的字段名称差异
-  if (item.title) title = item.title;
-  if (item.name) title = item.name;
-  if (item.keyword) title = item.keyword;
+  // 抖音 API 特定字段
+  if (platform === "抖音") {
+    title = item.word || item.title || "";
+    description = item.word || "";
+    hotValue = item.hot_value || 0;
+    // 从 word_cover 获取图片
+    if (item.word_cover && item.word_cover.url_list && item.word_cover.url_list.length > 0) {
+      imageUrl = item.word_cover.url_list[0];
+    }
+    // 根据 sentence_tag 判断分类
+    const tagMap: Record<number, string> = {
+      6000: "生活",
+      9000: "美食",
+      3001: "交通",
+      2005: "音乐",
+      2001: "游戏",
+      12000: "游戏",
+      13000: "娱乐",
+    };
+    category = tagMap[item.sentence_tag] || "综合";
+  } else {
+    // 处理其他平台的字段名称差异
+    if (item.title) title = item.title;
+    if (item.name) title = item.name;
+    if (item.keyword) title = item.keyword;
+    if (item.word) title = item.word;
 
-  if (item.desc) description = item.desc;
-  if (item.description) description = item.description;
+    if (item.desc) description = item.desc;
+    if (item.description) description = item.description;
 
-  if (item.hot) hotValue = parseInt(String(item.hot), 10) || 0;
-  if (item.heatValue) hotValue = item.heatValue;
-  if (item.heat) hotValue = item.heat;
+    if (item.hot) hotValue = parseInt(String(item.hot), 10) || 0;
+    if (item.hot_value) hotValue = item.hot_value;
+    if (item.heatValue) hotValue = item.heatValue;
+    if (item.heat) hotValue = item.heat;
 
-  if (item.url) url = item.url;
-  if (item.link) url = item.link;
+    if (item.url) url = item.url;
+    if (item.link) url = item.link;
 
-  if (item.image) imageUrl = item.image;
-  if (item.pic) imageUrl = item.pic;
-  if (item.img) imageUrl = item.img;
+    if (item.image) imageUrl = item.image;
+    if (item.pic) imageUrl = item.pic;
+    if (item.img) imageUrl = item.img;
 
-  if (item.category) category = item.category;
-  if (item.type) category = item.type;
+    if (item.category) category = item.category;
+    if (item.type) category = item.type;
+  }
 
   return {
     id: nanoid(36),
@@ -88,13 +112,10 @@ function parseTrendingItem(item: any, platform: Platform, rank: number): any {
     rank: rank + 1,
     title: title || "未知话题",
     description: description || "",
-    hotValue: hotValue,
-    url: url || "",
-    imageUrl: imageUrl || "",
-    category: category || "",
+    heat: hotValue,
+    link: url || "",
+    category: category || "综合",
     collectedAt: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
   };
 }
 
@@ -198,18 +219,23 @@ export const trendingRouter = router({
           });
         }
 
-        // 从 API 获取热榜数据
-        const rawData = await fetchTrendingData(input.platform);
+        // 从 API 获取数据
+        const apiData = await fetchTrendingData(input.platform);
 
-        // 解析并保存热榜数据
-        const parsedItems = rawData.map((item, index) =>
+        // 解析并保存数据
+        const itemsToInsert = apiData.slice(0, 50).map((item: any, index: number) => 
           parseTrendingItem(item, input.platform, index)
         );
 
-        // 删除该平台的旧数据（保留最近 7 天的数据）
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        if (itemsToInsert.length === 0) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "No data received from API",
+          });
+        }
 
+        // 删除旧数据（保留最近 7 天的数据）
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         await database
           .delete(trendingItems)
           .where(
@@ -219,28 +245,13 @@ export const trendingRouter = router({
             )
           );
 
-        // 批量插入新数据
-        if (parsedItems.length > 0) {
-          await database.insert(trendingItems).values(parsedItems);
-        }
-
-        // 保存快照
-        const snapshotId = nanoid(36);
-        const today = new Date().toISOString().split("T")[0];
-
-        await database.insert(trendingSnapshots).values({
-          id: snapshotId,
-          platform: input.platform,
-          snapshotDate: new Date(today),
-          data: JSON.stringify(parsedItems),
-          createdAt: new Date(),
-        });
+        // 插入新数据
+        await database.insert(trendingItems).values(itemsToInsert);
 
         return {
           success: true,
-          platform: input.platform,
-          count: parsedItems.length,
-          message: `Successfully collected ${parsedItems.length} trending items for ${input.platform}`,
+          message: `Successfully collected ${itemsToInsert.length} trending items for ${input.platform}`,
+          count: itemsToInsert.length,
         };
       } catch (error) {
         console.error("Failed to collect trending data:", error);
@@ -251,98 +262,41 @@ export const trendingRouter = router({
       }
     }),
 
-  // 获取热榜历史快照
-  getSnapshots: publicProcedure
-    .input(z.object({
-      platform: z.enum(["抖音", "微博", "快手", "B站"]),
-      days: z.number().min(1).max(30).optional().default(7),
-    }))
-    .query(async ({ input }) => {
-      try {
-        const database = await db.getDb();
-        if (!database) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
-        }
-
-        // 计算指定天数前的日期
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - input.days);
-
-        const snapshots = await database
-          .select()
-          .from(trendingSnapshots)
-          .where(
-            and(
-              eq(trendingSnapshots.platform, input.platform),
-              lte(trendingSnapshots.snapshotDate, new Date())
-            )
-          )
-          .orderBy(desc(trendingSnapshots.snapshotDate))
-          .limit(input.days);
-
-        return snapshots.map(snapshot => ({
-          ...snapshot,
-          data: JSON.parse(snapshot.data),
-        }));
-      } catch (error) {
-        console.error("Failed to get trending snapshots:", error);
+  // 获取热榜统计信息
+  getStats: publicProcedure.query(async () => {
+    try {
+      const database = await db.getDb();
+      if (!database) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch trending snapshots",
+          message: "Database not available",
         });
       }
-    }),
 
-  // 搜索热榜
-  search: publicProcedure
-    .input(z.object({
-      keyword: z.string().min(1),
-      platform: z.enum(["抖音", "微博", "快手", "B站"]).optional(),
-      limit: z.number().min(1).max(100).optional().default(30),
-    }))
-    .query(async ({ input }) => {
-      try {
-        const database = await db.getDb();
-        if (!database) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
-        }
+      const platforms: Platform[] = ["抖音", "微博", "快手", "B站"];
+      const stats: Record<Platform, number> = {
+        "抖音": 0,
+        "微博": 0,
+        "快手": 0,
+        "B站": 0,
+      };
 
-        // 构建查询条件
-        let query = database
-          .select()
+      for (const platform of platforms) {
+        const result = await database
+          .select({ count: sql<number>`count(*)` })
           .from(trendingItems)
-          .where(
-            input.platform
-              ? and(
-                  eq(trendingItems.platform, input.platform),
-                  // 搜索标题和描述
-                  // 注意：MySQL 的 LIKE 查询需要特殊处理
-                )
-              : undefined
-          )
-          .orderBy(desc(trendingItems.collectedAt))
-          .limit(input.limit);
-
-        // 由于 Drizzle ORM 的限制，这里使用简单的内存过滤
-        // 实际生产环境应该使用数据库的全文搜索
-        const items = await query;
-        return items.filter(
-          item =>
-            item.title.includes(input.keyword) ||
-            (item.description && item.description.includes(input.keyword))
-        );
-      } catch (error) {
-        console.error("Failed to search trending items:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to search trending data",
-        });
+          .where(eq(trendingItems.platform, platform));
+        
+        stats[platform] = result[0]?.count || 0;
       }
-    }),
+
+      return stats;
+    } catch (error) {
+      console.error("Failed to get trending stats:", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch trending stats",
+      });
+    }
+  }),
 });
