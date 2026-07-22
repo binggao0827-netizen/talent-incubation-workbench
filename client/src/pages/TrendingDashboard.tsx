@@ -182,7 +182,7 @@ export function TrendingDashboard() {
                       <p className="text-sm text-muted-foreground mt-2 italic">即将上线，敬请期待...</p>
                     )}
                   </div>
-                  <div className={`${colors.bg} ${colors.text} rounded-lg p-3 shadow-md`}>
+                  <div className={`${colors.bg} ${colors.text} rounded-lg p-3 shadow-md hidden`}>
                     <PlatformIcon platform={platform.value} size="lg" />
                   </div>
                 </div>
