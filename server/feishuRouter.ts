@@ -87,4 +87,74 @@ export const feishuRouter = router({
         });
       }
     }),
+
+  // Batch import scripts from local document (one-click import)
+  batchImportScripts: protectedProcedure
+    .input(z.object({
+      content: z.string(),
+      fileName: z.string(),
+      fileType: z.enum(["md", "txt", "docx"]),
+      documentTitle: z.string(),
+      accountId: z.string().optional(),
+      topicTag: z.string().optional(),
+      hookType: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.user) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      try {
+        // Parse document to extract scripts
+        const scripts = await parseDocument(
+          input.content,
+          input.fileType,
+          input.documentTitle
+        );
+
+        if (scripts.length === 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No scripts found in document",
+          });
+        }
+
+        // Create all scripts in batch
+        const createdScripts = [];
+        for (const script of scripts) {
+          try {
+            // Only create script if accountId is provided
+            if (!input.accountId) {
+              console.warn(`Skipping script ${script.scriptId}: accountId is required`);
+              continue;
+            }
+            
+            const created = await db.createScript({
+              title: script.title,
+              content: script.content,
+              accountId: input.accountId,
+              topicTag: (input.topicTag as any) || "其他",
+              hookType: (input.hookType as any) || "其他",
+              status: "草稿",
+            });
+            createdScripts.push(created);
+          } catch (error) {
+            console.error(`Failed to create script ${script.scriptId}:`, error);
+            // Continue with next script even if one fails
+          }
+        }
+
+        return {
+          success: true,
+          totalScripts: scripts.length,
+          createdScripts: createdScripts.length,
+          scripts: createdScripts,
+        };
+      } catch (error) {
+        console.error("Batch import error:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to import scripts",
+        });
+      }
+    }),
 });

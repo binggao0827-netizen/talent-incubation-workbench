@@ -12,7 +12,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { useState, useRef } from "react";
-import { Plus, FileText, Upload, AlertCircle } from "lucide-react";
+import { Plus, FileText, Upload, AlertCircle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,9 +63,12 @@ export default function ScriptsList() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [documentTitle, setDocumentTitle] = useState("");
   const [uploadAccountId, setUploadAccountId] = useState("");
-  const [parsedScripts, setParsedScripts] = useState<ParsedScript[]>([]);
-  const [isParsingFile, setIsParsingFile] = useState(false);
-  const [selectedScriptIndex, setSelectedScriptIndex] = useState<number | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    success: boolean;
+    totalScripts: number;
+    createdScripts: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: scripts, isLoading, refetch } = trpc.scripts.list.useQuery(
@@ -80,7 +83,7 @@ export default function ScriptsList() {
 
   const { data: accounts } = trpc.accounts.list.useQuery({});
   const createMutation = trpc.scripts.create.useMutation();
-  const parseDocumentMutation = trpc.feishu.parseLocalDocument.useMutation();
+  const batchImportMutation = trpc.feishu.batchImportScripts.useMutation();
 
   const form = useForm<ScriptFormValues>({
     resolver: zodResolver(scriptFormSchema),
@@ -108,16 +111,17 @@ export default function ScriptsList() {
     }
 
     setSelectedFile(file);
+    setImportResult(null);
   };
 
-  // Handle file upload and parsing
-  const handleUploadAndParse = async () => {
-    if (!selectedFile || !documentTitle.trim()) {
-      toast.error("请选择文件并输入文档标题");
+  // Handle batch import (one-click import all scripts)
+  const handleBatchImport = async () => {
+    if (!selectedFile || !documentTitle.trim() || !uploadAccountId) {
+      toast.error("请选择文件、输入文档标题并选择账号");
       return;
     }
 
-    setIsParsingFile(true);
+    setIsImporting(true);
     try {
       // Read file as base64
       const reader = new FileReader();
@@ -126,44 +130,49 @@ export default function ScriptsList() {
           const base64Content = (e.target?.result as string).split(",")[1] || "";
           const fileExtension = selectedFile.name.split(".").pop()?.toLowerCase() as "md" | "txt" | "docx";
 
-          const result = await parseDocumentMutation.mutateAsync({
+          const result = await batchImportMutation.mutateAsync({
             content: base64Content,
             fileName: selectedFile.name,
             fileType: fileExtension,
             documentTitle: documentTitle,
+            accountId: uploadAccountId,
+            topicTag: "其他",
+            hookType: "其他",
           });
 
-          if (result.scripts && result.scripts.length > 0) {
-            setParsedScripts(result.scripts);
-            setSelectedScriptIndex(0);
-            toast.success(`成功解析 ${result.scripts.length} 个脚本`);
+          if (result.success && result.createdScripts > 0) {
+            setImportResult({
+              success: true,
+              totalScripts: result.totalScripts,
+              createdScripts: result.createdScripts,
+            });
+            toast.success(`成功导入 ${result.createdScripts} 个脚本`);
+            
+            // Reset form after successful import
+            setTimeout(() => {
+              setSelectedFile(null);
+              setDocumentTitle("");
+              setUploadAccountId("");
+              setImportResult(null);
+              setOpen(false);
+              refetch();
+            }, 1500);
           } else {
-            toast.error("未能从文档中解析出脚本");
+            toast.error("未能导入任何脚本");
           }
         } catch (error) {
-          console.error("Parse error:", error);
-          toast.error("解析文档失败，请检查文件格式");
+          console.error("Import error:", error);
+          toast.error("导入脚本失败，请检查文件格式");
         } finally {
-          setIsParsingFile(false);
+          setIsImporting(false);
         }
       };
       reader.readAsDataURL(selectedFile);
     } catch (error) {
       console.error("File read error:", error);
       toast.error("读取文件失败");
-      setIsParsingFile(false);
+      setIsImporting(false);
     }
-  };
-
-  // Fill form with selected script
-  const handleSelectScript = (script: ParsedScript) => {
-    form.setValue("title", script.title);
-    form.setValue("content", script.content);
-    if (uploadAccountId) {
-      form.setValue("accountId", uploadAccountId);
-    }
-    setActiveTab("manual");
-    toast.success("已填充脚本信息，请完成其他字段后提交");
   };
 
   const onSubmit = async (data: ScriptFormValues) => {
@@ -251,69 +260,67 @@ export default function ScriptsList() {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="topicTag"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>选题标签</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="选择标签" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="剧情">剧情</SelectItem>
-                            <SelectItem value="测评">测评</SelectItem>
-                            <SelectItem value="教程">教程</SelectItem>
-                            <SelectItem value="种草">种草</SelectItem>
-                            <SelectItem value="搞笑">搞笑</SelectItem>
-                            <SelectItem value="知识">知识</SelectItem>
-                            <SelectItem value="其他">其他</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <FormField
+                  control={form.control}
+                  name="topicTag"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>内容类型</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="选择内容类型" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="剧情">剧情</SelectItem>
+                          <SelectItem value="测评">测评</SelectItem>
+                          <SelectItem value="教程">教程</SelectItem>
+                          <SelectItem value="种草">种草</SelectItem>
+                          <SelectItem value="搞笑">搞笑</SelectItem>
+                          <SelectItem value="知识">知识</SelectItem>
+                          <SelectItem value="其他">其他</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                  <FormField
-                    control={form.control}
-                    name="hookType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>钩子类型</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="选择钩子" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="提问式">提问式</SelectItem>
-                            <SelectItem value="悬念式">悬念式</SelectItem>
-                            <SelectItem value="痛点式">痛点式</SelectItem>
-                            <SelectItem value="反转式">反转式</SelectItem>
-                            <SelectItem value="数据式">数据式</SelectItem>
-                            <SelectItem value="其他">其他</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="hookType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>钩子类型</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="选择钩子类型" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="提问式">提问式</SelectItem>
+                          <SelectItem value="悬念式">悬念式</SelectItem>
+                          <SelectItem value="痛点式">痛点式</SelectItem>
+                          <SelectItem value="反转式">反转式</SelectItem>
+                          <SelectItem value="数据式">数据式</SelectItem>
+                          <SelectItem value="其他">其他</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
                   name="content"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>脚本正文</FormLabel>
+                      <FormLabel>脚本内容</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="输入脚本内容" className="min-h-24" {...field} />
+                        <Textarea placeholder="输入脚本内容" className="min-h-[200px]" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -325,33 +332,31 @@ export default function ScriptsList() {
                   name="ending"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>脚本结尾（可选）</FormLabel>
+                      <FormLabel>结尾（可选）</FormLabel>
                       <FormControl>
-                        <Input placeholder="输入脚本结尾" {...field} />
+                        <Textarea placeholder="输入脚本结尾" className="min-h-[100px]" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                  <div className="flex justify-end pt-2">
-                    <Button type="submit" disabled={createMutation.isPending}>
-                      {createMutation.isPending ? "创建中…" : "创建脚本"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
+                <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? "创建中…" : "创建脚本"}
+                </Button>
+                  </form>
+                </Form>
               </TabsContent>
 
-              {/* Local Upload Tab */}
+              {/* Local Upload Tab - Batch Import */}
               <TabsContent value="upload" className="space-y-4">
                 <div className="space-y-4">
                   {/* Account Selection */}
                   <div>
-                    <Label htmlFor="upload-account">关联账号</Label>
+                    <Label htmlFor="upload-account">关联账号 *</Label>
                     <Select value={uploadAccountId} onValueChange={setUploadAccountId}>
                       <SelectTrigger id="upload-account" className="mt-1">
-                        <SelectValue placeholder="选择账号（可选）" />
+                        <SelectValue placeholder="选择账号" />
                       </SelectTrigger>
                       <SelectContent>
                         {accounts?.map((account) => (
@@ -362,13 +367,13 @@ export default function ScriptsList() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
-                      选择一个账号，解析后的脚本将自动关联此账号
+                      所有导入的脚本都将关联到此账号
                     </p>
                   </div>
 
                   {/* Document Title Input */}
                   <div>
-                    <Label htmlFor="doc-title">文档标题（用于提取月份）</Label>
+                    <Label htmlFor="doc-title">文档标题（用于提取月份）*</Label>
                     <Input
                       id="doc-title"
                       placeholder="例如：2026年5月脚本、5月"
@@ -383,7 +388,7 @@ export default function ScriptsList() {
 
                   {/* File Upload Area */}
                   <div>
-                    <Label htmlFor="file-input">选择文件</Label>
+                    <Label htmlFor="file-input">选择文件 *</Label>
                     <div className="mt-1 border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent/50 transition-colors cursor-pointer"
                       onClick={() => fileInputRef.current?.click()}
                     >
@@ -405,67 +410,35 @@ export default function ScriptsList() {
                     </div>
                   </div>
 
-                  {/* Parse Button */}
-                  <Button
-                    onClick={handleUploadAndParse}
-                    disabled={!selectedFile || !documentTitle.trim() || isParsingFile || parseDocumentMutation.isPending}
-                    className="w-full"
-                  >
-                    {isParsingFile || parseDocumentMutation.isPending ? "解析中…" : "解析文档"}
-                  </Button>
-
-                  {/* Parsed Scripts List */}
-                  {parsedScripts.length > 0 && (
-                    <div className="space-y-2">
-                      <Label>解析结果（{parsedScripts.length} 个脚本）</Label>
-                      <div className="border border-border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
-                        {parsedScripts.map((script, idx) => (
-                          <div
-                            key={idx}
-                            className={`p-3 border-b border-border last:border-b-0 cursor-pointer transition-colors ${
-                              selectedScriptIndex === idx
-                                ? "bg-accent/20 border-l-2 border-l-accent"
-                                : "hover:bg-accent/10"
-                            }`}
-                            onClick={() => {
-                              setSelectedScriptIndex(idx);
-                              handleSelectScript(script);
-                            }}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium">{script.scriptId}: {script.title}</p>
-                                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{script.content}</p>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelectScript(script);
-                                }}
-                              >
-                                使用
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Error State */}
-                  {parseDocumentMutation.isError && (
-                    <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                      <AlertCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+                  {/* Import Success Message */}
+                  {importResult?.success && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-destructive">解析失败</p>
-                        <p className="text-xs text-destructive/80 mt-0.5">
-                          {(parseDocumentMutation.error as any)?.message || "请检查文件格式是否正确"}
+                        <p className="font-medium text-green-900">导入成功！</p>
+                        <p className="text-sm text-green-800 mt-1">
+                          成功导入 {importResult.createdScripts} 个脚本（共 {importResult.totalScripts} 个）
                         </p>
                       </div>
                     </div>
                   )}
+
+                  {/* Import Button */}
+                  <Button
+                    onClick={handleBatchImport}
+                    disabled={!selectedFile || !documentTitle.trim() || !uploadAccountId || isImporting || batchImportMutation.isPending}
+                    className="w-full"
+                  >
+                    {isImporting || batchImportMutation.isPending ? "导入中…" : "一键导入所有脚本"}
+                  </Button>
+
+                  {/* Info Message */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-blue-800">
+                      系统将自动解析文档中的所有脚本并直接导入。脚本内容会保留源文档的排版格式（Markdown）。
+                    </p>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
@@ -474,87 +447,52 @@ export default function ScriptsList() {
         }
       />
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        <Input
-          placeholder="搜索脚本…"
-          className="max-w-xs h-9"
-          value={filters.search}
-          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-        />
-        <Select value={filters.topicTag || "all"} onValueChange={(value) => setFilters({ ...filters, topicTag: value === "all" ? "" : value })}>
-          <SelectTrigger className="w-36 h-9">
-            <SelectValue placeholder="选题标签" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全部标签</SelectItem>
-            <SelectItem value="剧情">剧情</SelectItem>
-            <SelectItem value="测评">测评</SelectItem>
-            <SelectItem value="教程">教程</SelectItem>
-            <SelectItem value="种草">种草</SelectItem>
-            <SelectItem value="搞笑">搞笑</SelectItem>
-            <SelectItem value="知识">知识</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filters.status || "all"} onValueChange={(value) => setFilters({ ...filters, status: value === "all" ? "" : value })}>
-          <SelectTrigger className="w-36 h-9">
-            <SelectValue placeholder="脚本状态" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全部状态</SelectItem>
-            <SelectItem value="草稿">草稿</SelectItem>
-            <SelectItem value="审核">审核</SelectItem>
-            <SelectItem value="发布">发布</SelectItem>
-            <SelectItem value="归档">归档</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* Scripts List */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Spinner />
-        </div>
-      ) : scripts && scripts.length > 0 ? (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          {scripts.map((script, idx) => (
-            <div
-              key={script.id}
-              className={`cursor-pointer px-5 py-4 hover:bg-accent/60 transition-colors duration-150 group ${
-                idx > 0 ? "border-t border-border" : ""
-              }`}
-              onClick={() => navigate(`/scripts/${script.id}`)}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <h3 className="text-sm font-medium group-hover:underline underline-offset-4 decoration-border">
-                      {script.title}
-                    </h3>
-                    <StatusDot status={script.status || "草稿"} />
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <Tag>{script.topicTag}</Tag>
-                    <Tag>{script.hookType}</Tag>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-1 mt-2">{script.content}</p>
-                </div>
-                <span className="font-data text-xs text-muted-foreground shrink-0 pt-0.5">
-                  {script.publishDate
-                    ? new Date(script.publishDate).toLocaleDateString("zh-CN")
-                    : "未发布"}
-                </span>
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>脚本列表</CardTitle>
+          <CardDescription>
+            {scripts?.length || 0} 个脚本
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Spinner />
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-16 border border-dashed border-border rounded-lg">
-          <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" strokeWidth={1.5} />
-          <p className="text-sm text-muted-foreground mb-4">还没有脚本，点击“新增脚本”开始</p>
-          <Button variant="outline" size="sm" onClick={() => setOpen(true)}>新增脚本</Button>
-        </div>
-      )}
+          ) : scripts && scripts.length > 0 ? (
+            <div className="space-y-4">
+              {scripts.map((script) => (
+                <Card key={script.id} className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => navigate(`/scripts/${script.id}`)}
+                >
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-base">{script.title}</h3>
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{script.content}</p>
+                        <div className="flex items-center gap-2 mt-3 flex-wrap">
+                          {script.topicTag && <Tag>{script.topicTag}</Tag>}
+                          {script.hookType && <Tag>{script.hookType}</Tag>}
+                          {script.status && <StatusDot status={script.status} />}
+                        </div>
+                      </div>
+                      <div className="text-right text-sm text-muted-foreground flex-shrink-0">
+                        <p className="text-xs mt-1">{new Date(script.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <FileText className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-muted-foreground">暂无脚本</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
