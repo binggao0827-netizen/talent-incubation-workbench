@@ -12,7 +12,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { useState, useRef } from "react";
-import { Plus, FileText, Upload, AlertCircle, CheckCircle, ChevronDown, ChevronUp, Save, X } from "lucide-react";
+import { Plus, FileText, Upload, AlertCircle, CheckCircle, ChevronDown, ChevronUp, Save, X, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -57,6 +57,18 @@ interface EditingScriptState {
   status: string;
 }
 
+const metricsFormSchema = z.object({
+  views: z.number().optional(),
+  likes: z.number().optional(),
+  comments: z.number().optional(),
+  shares: z.number().optional(),
+  newFollowers: z.number().optional(),
+  completionRate: z.string().optional(),
+  recordDate: z.string(),
+});
+
+type MetricsFormValues = z.infer<typeof metricsFormSchema>;
+
 export default function ScriptsList() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
@@ -84,6 +96,17 @@ export default function ScriptsList() {
     createdScripts: number;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Metrics input state
+  const [metricsScriptId, setMetricsScriptId] = useState<string | null>(null);
+  const [isSavingMetrics, setIsSavingMetrics] = useState(false);
+  
+  const metricsForm = useForm<MetricsFormValues>({
+    resolver: zodResolver(metricsFormSchema),
+    defaultValues: {
+      recordDate: new Date().toISOString().split("T")[0],
+    },
+  });
 
   const { data: scripts, isLoading, refetch } = trpc.scripts.list.useQuery(
     filters.topicTag || filters.status || filters.search
@@ -99,6 +122,7 @@ export default function ScriptsList() {
   const createMutation = trpc.scripts.create.useMutation();
   const updateMutation = trpc.scripts.update.useMutation();
   const batchImportMutation = trpc.feishu.batchImportScripts.useMutation();
+  const createMetricsMutation = trpc.metrics.create.useMutation();
 
   const form = useForm<ScriptFormValues>({
     resolver: zodResolver(scriptFormSchema),
@@ -245,6 +269,33 @@ export default function ScriptsList() {
   const handleCancelEdit = () => {
     setExpandedScriptId(null);
     setEditingScript(null);
+  };
+
+  // Handle metrics submission
+  const handleMetricsSubmit = async (data: MetricsFormValues) => {
+    if (!metricsScriptId) return;
+
+    setIsSavingMetrics(true);
+    try {
+      await createMetricsMutation.mutateAsync({
+        scriptId: metricsScriptId,
+        ...data,
+        recordDate: new Date(data.recordDate),
+      } as any);
+      toast.success("数据录入成功");
+      metricsForm.reset();
+      setMetricsScriptId(null);
+      refetch();
+    } catch (error) {
+      console.error("Metrics error:", error);
+      toast.error("录入失败，请重试");
+    } finally {
+      setIsSavingMetrics(false);
+    }
+  };
+
+  const onMetricsSubmit = (data: MetricsFormValues) => {
+    handleMetricsSubmit(data);
   };
 
   const onSubmit = async (data: ScriptFormValues) => {
@@ -671,33 +722,43 @@ export default function ScriptsList() {
                         />
                       </div>
 
-                      <div className="flex gap-2 justify-end">
+                      <div className="flex gap-2 justify-between">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={handleCancelEdit}
-                          disabled={isSavingEdit}
+                          onClick={() => setMetricsScriptId(script.id)}
                         >
-                          <X className="w-4 h-4 mr-1" />
-                          取消
+                          <BarChart3 className="w-4 h-4 mr-1" />
+                          录入数据
                         </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSaveEdit}
-                          disabled={isSavingEdit}
-                        >
-                          {isSavingEdit ? (
-                            <>
-                              <Spinner className="w-4 h-4 mr-1" />
-                              保存中…
-                            </>
-                          ) : (
-                            <>
-                              <Save className="w-4 h-4 mr-1" />
-                              保存
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCancelEdit}
+                            disabled={isSavingEdit}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            取消
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleSaveEdit}
+                            disabled={isSavingEdit}
+                          >
+                            {isSavingEdit ? (
+                              <>
+                                <Spinner className="w-4 h-4 mr-1" />
+                                保存中…
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4 mr-1" />
+                                保存
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -712,6 +773,156 @@ export default function ScriptsList() {
           )}
         </CardContent>
       </Card>
+
+      {/* Metrics Input Dialog */}
+      <Dialog open={metricsScriptId !== null} onOpenChange={(open) => {
+        if (!open) {
+          setMetricsScriptId(null);
+          metricsForm.reset();
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>录入脚本数据</DialogTitle>
+            <DialogDescription>
+              记录脚本的播放、互动等数据表现
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...metricsForm}>
+            <form onSubmit={metricsForm.handleSubmit(onMetricsSubmit)} className="space-y-4">
+              <FormField
+                control={metricsForm.control}
+                name="recordDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>记录日期</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={metricsForm.control}
+                  name="views"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>播放量</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={metricsForm.control}
+                  name="likes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>点赞</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={metricsForm.control}
+                  name="comments"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>评论</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={metricsForm.control}
+                  name="shares"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>分享</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={metricsForm.control}
+                name="newFollowers"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>消新增粉丝</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setMetricsScriptId(null);
+                    metricsForm.reset();
+                  }}
+                >
+                  取消
+                </Button>
+                <Button type="submit" size="sm" disabled={isSavingMetrics}>
+                  {isSavingMetrics ? "录入中…" : "确认录入"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
