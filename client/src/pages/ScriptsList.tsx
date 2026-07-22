@@ -125,7 +125,6 @@ export default function ScriptsList() {
   const createMutation = trpc.scripts.create.useMutation();
   const updateMutation = trpc.scripts.update.useMutation();
   const batchImportMutation = trpc.feishu.batchImportScripts.useMutation();
-  const batchCreateMutation = trpc.feishu.batchCreateScripts.useMutation();
   const parseFeishuMutation = trpc.feishu.parseFeishuDocument.useMutation();
   const createMetricsMutation = trpc.metrics.create.useMutation();
 
@@ -228,31 +227,46 @@ export default function ScriptsList() {
 
     setIsImporting(true);
     try {
-      const result = await parseFeishuMutation.mutateAsync({
+      // Step 1: Fetch Feishu document content
+      const fetchResult = await parseFeishuMutation.mutateAsync({
         documentUrl: feishuLink,
       });
       
-      if (result.scripts && result.scripts.length > 0) {
-        // Batch create scripts from parsed Feishu document
-        const importResult = await batchCreateMutation.mutateAsync({
-          scripts: result.scripts,
-          accountId: uploadAccountId,
-        });
+      if (!fetchResult.content) {
+        toast.error("无法获取飞书文档内容，请检查链接是否有效");
+        return;
+      }
+
+      // Step 2: Use batchImportScripts to parse and create scripts (same as local upload)
+      const importResult = await batchImportMutation.mutateAsync({
+        content: fetchResult.content,
+        fileName: "feishu-import",
+        fileType: "md",
+        documentTitle,
+        accountId: uploadAccountId,
+        topicTag: "其他",
+        hookType: "其他",
+      });
+      
+      setImportResult(importResult);
+      if (importResult.success && importResult.createdScripts > 0) {
+        toast.success(`成功导入 ${importResult.createdScripts} 个脚本`);
+        setFeishuLink("");
+        setDocumentTitle("");
+        setUploadAccountId("");
         
-        setImportResult(importResult);
-        if (importResult.success) {
-          toast.success(`成功导入 ${importResult.createdScripts} 个脚本`);
-          setFeishuLink("");
-          setDocumentTitle("");
-          setUploadAccountId("");
+        // Reset form after successful import
+        setTimeout(() => {
+          setImportResult(null);
+          setOpen(false);
           refetch();
-        }
+        }, 1500);
       } else {
-        toast.error("未找到脚本内容，请检查链接是否有效");
+        toast.error("未能导入任何脚本，请检查文档格式");
       }
     } catch (error) {
       console.error("Feishu import error:", error);
-      toast.error("导入失败，请检查链接是否有效");
+      toast.error("导入失败，请检查链接是否有效或文档格式");
     } finally {
       setIsImporting(false);
     }
