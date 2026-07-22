@@ -6,6 +6,7 @@ import { z } from "zod";
 import * as db from "./db";
 import { TRPCError } from "@trpc/server";
 import * as ai from "./ai";
+import { feishuRouter } from "./feishuRouter";
 
 // Helper to check if user is admin
 function isAdmin(userRole?: string): boolean {
@@ -499,6 +500,9 @@ export const appRouter = router({
         return db.createHotTopic(input);
       }),
   }),
+
+  // ========== Feishu Router ==========
+  feishu: feishuRouter,
 
   // ========== AI Router ==========
   ai: router({

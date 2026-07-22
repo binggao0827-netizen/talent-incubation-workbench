@@ -17,6 +17,7 @@ import Dashboard from "./pages/Dashboard";
 import AIFeatures from "./pages/AIFeatures";
 import CreatorsList from "./pages/CreatorsList";
 import ContentTypesList from "./pages/ContentTypesList";
+import { FeishuSettings } from "./pages/FeishuSettings";
 
 function Router() {
   return (
@@ -100,6 +101,15 @@ function Router() {
       <Route path={"/ai"}>
         {() => (
           <AIFeatures />
+        )}
+      </Route>
+
+      {/* Settings routes */}
+      <Route path={"/settings/feishu"}>
+        {() => (
+          <DashboardLayout>
+            <FeishuSettings />
+          </DashboardLayout>
         )}
       </Route>
 
