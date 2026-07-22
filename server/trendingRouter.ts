@@ -112,8 +112,9 @@ function parseTrendingItem(item: any, platform: Platform, rank: number): any {
     rank: rank + 1,
     title: title || "未知话题",
     description: description || "",
-    heat: hotValue,
-    link: url || "",
+    hotValue: hotValue,
+    url: url || "",
+    imageUrl: imageUrl || "",
     category: category || "综合",
     collectedAt: new Date(),
   };

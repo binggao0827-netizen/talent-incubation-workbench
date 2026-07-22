@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { AlertCircle, RefreshCw, TrendingUp, Lock, Search, ArrowUpDown, X, Filter } from "lucide-react";
+import { AlertCircle, RefreshCw, TrendingUp, Lock, Search, ArrowUpDown, X, Filter, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 
@@ -20,16 +20,23 @@ const PLATFORMS: { value: Platform; label: string; color: string }[] = [
   { value: "B站", label: "B站", color: "bg-blue-500" },
 ];
 
+// 平台热榜链接
+const PLATFORM_URLS: Record<Platform, string> = {
+  "抖音": "https://www.douyin.com/search?keyword=%s&type=general",
+  "微博": "https://s.weibo.com/weibo?q=%s",
+  "快手": "https://www.kuaishou.com/search?keyword=%s",
+  "B站": "https://search.bilibili.com/all?keyword=%s",
+};
+
 export function TrendingDashboard() {
   const { user } = useAuth();
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>("抖音");
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"rank" | "hotValue">("rank");
+  const [sortBy, setSortBy] = useState<"rank" | "heat">("rank");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [minHotValue, setMinHotValue] = useState<number | null>(null);
-  const [onlyWithUrl, setOnlyWithUrl] = useState(false);
+  const [minHeat, setMinHeat] = useState<number | null>(null);
 
   // 获取所有平台的热榜数据
   const { data: allPlatformsData, isLoading: isLoadingAll, refetch: refetchAll } = trpc.trending.getAllPlatforms.useQuery({
@@ -51,382 +58,359 @@ export function TrendingDashboard() {
     },
     onError: (error) => {
       setRefreshing(false);
-      const errorMsg = error.message || "采集热榜数据失败";
-      toast.error(errorMsg);
-      console.error("Failed to collect trending data:", error);
+      toast.error(error.message || "采集失败");
     },
   });
 
-  // 处理刷新
-  const handleRefresh = async () => {
-    if (user?.role !== "admin") {
-      toast.error("只有管理员可以采集热榜数据");
+  const handleCollect = async () => {
+    if (!user || user.role !== "admin") {
+      toast.error("只有管理员可以采集数据");
       return;
     }
     setRefreshing(true);
-    try {
-      await collectMutation.mutateAsync({ platform: selectedPlatform });
-    } catch (error) {
-      console.error("Refresh failed:", error);
-    }
+    await collectMutation.mutateAsync({ platform: selectedPlatform });
   };
 
-  // 计算热度排名变化，支持搜索、排序、筛选
-  const trendingItems = useMemo(() => {
-    if (!platformData) return [];
-    
-    let filtered = platformData;
-    
-    // 应用搜索过滤
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.title.toLowerCase().includes(query) ||
-          item.description?.toLowerCase().includes(query) ||
-          item.category?.toLowerCase().includes(query)
-      );
-    }
-    
-    // 应用分类筛选
-    if (selectedCategory) {
-      filtered = filtered.filter((item) => item.category === selectedCategory);
-    }
-    
-    // 应用热度区间筛选
-    if (minHotValue !== null && minHotValue > 0) {
-      filtered = filtered.filter((item) => (item.hotValue || 0) >= minHotValue);
-    }
-    
-    // 应用仅有链接的筛选
-    if (onlyWithUrl) {
-      filtered = filtered.filter((item) => item.url && item.url.trim().length > 0);
-    }
-    
-    // 应用排序
-    const sorted = [...filtered].sort((a, b) => {
-      let aVal: number;
-      let bVal: number;
-      
-      if (sortBy === "rank") {
-        aVal = a.rank || 0;
-        bVal = b.rank || 0;
-      } else {
-        aVal = a.hotValue || 0;
-        bVal = b.hotValue || 0;
-      }
-      
-      return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
-    });
-    
-    return sorted;
-  }, [platformData, searchQuery, sortBy, sortOrder, selectedCategory, minHotValue, onlyWithUrl]);
+  // 获取当前平台的数据
+  const currentData = platformData || [];
 
-  // 提取所有分类
-  const categories = useMemo(() => {
-    if (!platformData) return [];
-    const cats = new Set<string>();
-    platformData.forEach((item) => {
-      if (item.category) cats.add(item.category);
-    });
-    return Array.from(cats).sort();
-  }, [platformData]);
+  // 获取所有分类
+  const allCategories = Array.from(
+    new Set(currentData.map((item: any) => item.category).filter(Boolean))
+  );
 
-  // 获取热度最高的项目
-  const topItems = useMemo(() => {
-    if (!allPlatformsData) {
-      return {
-        "抖音": [],
-        "微博": [],
-        "快手": [],
-        "B站": [],
-      };
+  // 过滤和排序数据
+  let filteredData = currentData.filter((item: any) => {
+    const matchesSearch =
+      !searchQuery ||
+      item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.category?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesCategory = !selectedCategory || item.category === selectedCategory;
+    const matchesHeat = !minHeat || item.hotValue >= minHeat;
+
+    return matchesSearch && matchesCategory && matchesHeat;
+  });
+
+  // 排序
+  filteredData = [...filteredData].sort((a: any, b: any) => {
+    let aVal = sortBy === "rank" ? a.rank : a.hotValue;
+    let bVal = sortBy === "rank" ? b.rank : b.hotValue;
+
+    if (sortOrder === "asc") {
+      return aVal - bVal;
+    } else {
+      return bVal - aVal;
     }
-    const result: Record<Platform, any[]> = {
-      "抖音": [],
-      "微博": [],
-      "快手": [],
-      "B站": [],
-    };
-    Object.entries(allPlatformsData).forEach(([platform, items]) => {
-      result[platform as Platform] = (items as any[]).slice(0, 5);
-    });
-    return result;
-  }, [allPlatformsData]);
+  });
 
-  // 检查是否有活跃的筛选条件
-  const hasActiveFilters = selectedCategory || minHotValue || onlyWithUrl;
+  // 权限检查
+  if (!user) {
+    return (
+      <div className="space-y-4">
+        <Alert>
+          <Lock className="h-4 w-4" />
+          <AlertDescription>请先登录查看热榜数据</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (user.role !== "admin") {
+    return (
+      <div className="space-y-4">
+        <Alert>
+          <Lock className="h-4 w-4" />
+          <AlertDescription>只有管理员可以查看热榜看板</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  const isLoading = isLoadingAll || isLoadingPlatform;
 
   return (
     <div className="space-y-6">
-      {/* 页面标题 */}
+      {/* 头部 */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">热榜看板</h1>
           <p className="text-muted-foreground mt-2">实时追踪多平台热点话题，助力内容选题</p>
         </div>
-        <Button
-          onClick={handleRefresh}
-          disabled={refreshing || collectMutation.isPending || user?.role !== "admin"}
-          size="lg"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-          {refreshing ? "刷新中..." : "刷新数据"}
-        </Button>
+        {user?.role === "admin" && (
+          <Button
+            onClick={handleCollect}
+            disabled={refreshing || collectMutation.isPending}
+            size="lg"
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "采集中..." : "刷新数据"}
+          </Button>
+        )}
       </div>
-
-      {/* 权限提示 */}
-      {user?.role !== "admin" && (
-        <Alert>
-          <Lock className="h-4 w-4" />
-          <AlertDescription>
-            您没有采集权限。只有管理员可以手动采集热榜数据。系统会定期自动采集。
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* 错误提示 */}
-      {collectMutation.isError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {collectMutation.error?.message || "获取热榜数据失败，请稍后重试"}
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* 平台概览卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {PLATFORMS.map((platform) => (
-          <Card
-            key={platform.value}
-            className="cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => setSelectedPlatform(platform.value)}
-          >
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">{platform.label}</CardTitle>
-                <div className={`w-3 h-3 rounded-full ${platform.color}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="text-2xl font-bold">
-                  {topItems[platform.value]?.length || 0}
+        {PLATFORMS.map((platform) => {
+          const count = allPlatformsData?.[platform.value]?.length || 0;
+          return (
+            <Card key={platform.value}>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">{platform.label}</p>
+                    <p className="text-2xl font-bold mt-2">{count}</p>
+                    <p className="text-xs text-muted-foreground mt-1">热点话题数</p>
+                  </div>
+                  <div className={`${platform.color} rounded-lg p-3`}>
+                    <TrendingUp className="h-6 w-6 text-white" />
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">热点话题数</div>
-                <div className="space-y-1">
-                  {topItems[platform.value]?.slice(0, 3).map((item: any, idx: number) => (
-                    <div key={idx} className="text-xs truncate text-muted-foreground">
-                      {idx + 1}. {item.title}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      {/* 详细热榜列表 */}
+      {/* 热榜列表 */}
       <Card>
         <CardHeader>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>
-                  {PLATFORMS.find((p) => p.value === selectedPlatform)?.label} 热榜
-                </CardTitle>
-                <CardDescription>
-                  实时热点排行榜，共 {trendingItems.length} 条 • 更新于 {new Date().toLocaleTimeString("zh-CN")}
-                </CardDescription>
-              </div>
-              <Tabs defaultValue={selectedPlatform} onValueChange={(v) => setSelectedPlatform(v as Platform)}>
-                <TabsList>
-                  {PLATFORMS.map((platform) => (
-                    <TabsTrigger key={platform.value} value={platform.value}>
-                      {platform.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>{selectedPlatform}热榜</CardTitle>
+              <CardDescription>
+                实时热点话题排行，共 {filteredData.length} 条，更新于 {new Date().toLocaleTimeString('zh-CN')}
+              </CardDescription>
             </div>
-            
-            {/* 搜索和排序工具栏 */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* 搜索框 */}
-              <div className="flex-1 min-w-[200px] relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Tabs value={selectedPlatform} onValueChange={(v) => setSelectedPlatform(v as Platform)}>
+              <TabsList>
+                {PLATFORMS.map((p) => (
+                  <TabsTrigger key={p.value} value={p.value}>
+                    {p.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {/* 搜索和筛选 */}
+          <div className="flex flex-col gap-4">
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="搜索话题、描述、分类..."
+                  placeholder="搜索标题、描述、分类..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                  >
-                    <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                  </button>
-                )}
-              </div>
-              
-              {/* 排序按钮 */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSortBy(sortBy === "rank" ? "hotValue" : "rank")}
-                className="gap-2"
-              >
-                <ArrowUpDown className="w-4 h-4" />
-                按 {sortBy === "rank" ? "排名" : "热度"}
-              </Button>
-              
-              {/* 排序顺序按钮 */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              >
-                {sortOrder === "asc" ? "↑" : "↓"}
-              </Button>
-            </div>
-
-            {/* 筛选条件 */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* 分类筛选 */}
-              {categories.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-muted-foreground" />
-                  <select
-                    value={selectedCategory || ""}
-                    onChange={(e) => setSelectedCategory(e.target.value || null)}
-                    className="text-sm border rounded px-2 py-1 bg-background"
-                  >
-                    <option value="">全部分类</option>
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              
-              {/* 热度筛选 */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">最低热度:</span>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={minHotValue ?? ""}
-                  onChange={(e) => setMinHotValue(e.target.value ? parseInt(e.target.value, 10) : null)}
-                  className="w-20 text-sm"
+                  className="pl-10"
                 />
               </div>
-              
-              {/* 仅有链接筛选 */}
               <Button
-                variant={onlyWithUrl ? "default" : "outline"}
-                size="sm"
-                onClick={() => setOnlyWithUrl(!onlyWithUrl)}
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                }}
+                title={`按${sortBy === "rank" ? "排名" : "热度"}${sortOrder === "asc" ? "升序" : "降序"}`}
               >
-                仅有链接
+                <ArrowUpDown className="h-4 w-4" />
               </Button>
-              
-              {/* 重置按钮 */}
-              {hasActiveFilters && (
+              {(searchQuery || selectedCategory || minHeat) && (
                 <Button
-                  variant="ghost"
-                  size="sm"
+                  variant="outline"
                   onClick={() => {
+                    setSearchQuery("");
                     setSelectedCategory(null);
-                    setMinHotValue(null);
-                    setOnlyWithUrl(false);
+                    setMinHeat(null);
                   }}
                 >
+                  <X className="mr-2 h-4 w-4" />
                   重置筛选
                 </Button>
               )}
             </div>
+
+            {/* 高级筛选 */}
+            <div className="flex flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">分类:</span>
+              </div>
+              {allCategories.map((category) => (
+                <Badge
+                  key={category}
+                  variant={selectedCategory === category ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() =>
+                    setSelectedCategory(selectedCategory === category ? null : category)
+                  }
+                >
+                  {category}
+                </Badge>
+              ))}
+              <div className="flex items-center gap-2 ml-4">
+                <span className="text-sm text-muted-foreground">最低热度:</span>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={minHeat || ""}
+                  onChange={(e) => setMinHeat(e.target.value ? parseInt(e.target.value) : null)}
+                  className="w-24"
+                />
+              </div>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {isLoadingPlatform ? (
-            <div className="space-y-4">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
+
+          {/* 热榜列表 - 卡片式表格 */}
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-24 w-full" />
               ))}
             </div>
-          ) : trendingItems.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">
-                {searchQuery ? "没有找到匹配的热榜数据" : hasActiveFilters ? "没有符合筛选条件的热榜数据" : "暂无热榜数据，请点击\"刷新数据\"获取最新信息"}
-              </p>
+          ) : filteredData.length === 0 ? (
+            <div className="text-center py-12">
+              <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">没有找到匹配的热榜数据</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {trendingItems.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="flex items-start gap-4 p-3 rounded-lg border hover:bg-accent transition-colors"
-                >
+            <div className="space-y-2">
+              {/* 表头 - 梁面不显示 */}
+              <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-muted rounded-lg font-semibold text-sm">
+                <div className="col-span-1">排名</div>
+                <div className="col-span-1">封面</div>
+                <div className="col-span-5">炭点标题</div>
+                <div className="col-span-2">炭度</div>
+                <div className="col-span-2">视频数</div>
+                <div className="col-span-1">操作</div>
+              </div>
+
+              {/* 数据行 - 梁面表格布局 */}
+              {filteredData.map((item: any, index: number) => (
+                <div key={item.id} className="space-y-2">
+                  <a
+                    href={PLATFORM_URLS[selectedPlatform].replace("%s", encodeURIComponent(item.title))}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-card border rounded-lg hover:bg-accent transition-colors items-center cursor-pointer"
+                  >
                   {/* 排名 */}
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white font-bold text-sm">
-                    {item.rank}
+                  <div className="col-span-1">
+                    <div className="flex items-center justify-center">
+                      <div className="bg-gradient-to-br from-pink-500 to-rose-500 text-white font-bold text-lg w-8 h-8 rounded-full flex items-center justify-center">
+                        {item.rank}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* 内容 */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm truncate hover:text-clip">
-                      {item.title}
-                    </h3>
-                    {item.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                        {item.description}
-                      </p>
+                  {/* 封面 */}
+                  <div className="col-span-1">
+                    {item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.title}
+                        className="w-12 h-12 rounded object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      </div>
                     )}
-                    <div className="flex items-center gap-2 mt-2">
+                  </div>
+
+                  {/* 标题和分类 */}
+                  <div className="col-span-5">
+                    <p className="font-medium text-sm line-clamp-2">{item.title}</p>
+                    {item.category && (
+                      <Badge variant="secondary" className="mt-1 text-xs">
+                        {item.category}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* 热度 */}
+                  <div className="col-span-2">
+                    <div className="text-right">
+                      <p className="font-bold text-pink-500">
+                        {item.hotValue > 1000000
+                          ? (item.hotValue / 1000000).toFixed(1) + "M"
+                          : item.hotValue > 1000
+                          ? (item.hotValue / 1000).toFixed(1) + "K"
+                          : item.hotValue}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 视频数 */}
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground text-center">-</p>
+                  </div>
+
+                  {/* 操作 */}
+                  <div className="col-span-1">
+                    <Button variant="ghost" size="sm" onClick={(e) => e.preventDefault()}>
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  </a>
+
+                  {/* 移动端卡片 */}
+                  <a
+                    href={PLATFORM_URLS[selectedPlatform].replace("%s", encodeURIComponent(item.title))}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="md:hidden bg-card border rounded-lg p-4 space-y-3 block hover:bg-accent transition-colors"
+                  >
+                  <div className="flex items-start gap-3">
+                    {/* 排名 */}
+                    <div className="flex-shrink-0">
+                      <div className="bg-gradient-to-br from-pink-500 to-rose-500 text-white font-bold text-lg w-8 h-8 rounded-full flex items-center justify-center">
+                        {item.rank}
+                      </div>
+                    </div>
+                    {/* 封面 */}
+                    <div className="flex-shrink-0">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="w-12 h-12 rounded object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
+                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    {/* 标题和炭度 */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm line-clamp-2 hover:text-pink-500 transition-colors">
+                        {item.title}
+                      </p>
                       {item.category && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="secondary" className="mt-1 text-xs">
                           {item.category}
                         </Badge>
                       )}
-                      <span className="text-xs text-muted-foreground">
-                        热度: {item.hotValue}
-                      </span>
+                      <p className="font-bold text-pink-500 mt-2">
+                        {item.hotValue > 1000000
+                          ? (item.hotValue / 1000000).toFixed(1) + "M"
+                          : item.hotValue > 1000
+                          ? (item.hotValue / 1000).toFixed(1) + "K"
+                          : item.hotValue}
+                      </p>
                     </div>
                   </div>
-
-                  {/* 热度指示 */}
-                  <div className="flex-shrink-0 text-right">
-                    <div className="flex items-center gap-1 text-sm font-semibold text-orange-500">
-                      <TrendingUp className="w-4 h-4" />
-                      {item.hotValue}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(item.collectedAt).toLocaleTimeString("zh-CN")}
-                    </p>
-                  </div>
-
-                  {/* 链接 */}
-                  {item.url && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      asChild
-                      className="flex-shrink-0"
-                    >
-                      <a href={item.url} target="_blank" rel="noopener noreferrer">
-                        查看
-                      </a>
-                    </Button>
-                  )}
+                  </a>
                 </div>
               ))}
             </div>
@@ -434,17 +418,15 @@ export function TrendingDashboard() {
         </CardContent>
       </Card>
 
-      {/* 热榜历史 */}
+      {/* 趋势分析占位符 */}
       <Card>
         <CardHeader>
           <CardTitle>热榜趋势</CardTitle>
-          <CardDescription>
-            查看过去 7 天的热榜变化趋势
-          </CardDescription>
+          <CardDescription>查看过去 7 天的热榜变化趋势</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <p>趋势分析功能即将上线，敬请期待...</p>
+          <div className="h-64 flex items-center justify-center bg-muted rounded-lg">
+            <p className="text-muted-foreground">趋势分析功能即将上线，敬请期待...</p>
           </div>
         </CardContent>
       </Card>
