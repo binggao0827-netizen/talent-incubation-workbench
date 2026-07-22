@@ -202,3 +202,19 @@ export const hotTopics = mysqlTable("hot_topics", {
 
 export type HotTopic = typeof hotTopics.$inferSelect;
 export type InsertHotTopic = typeof hotTopics.$inferInsert;
+
+/**
+ * 飞书配置表
+ * 存储飞书 API 凭证
+ */
+export const feishuConfigs = mysqlTable("feishu_configs", {
+  id: varchar("id", { length: 36 }).primaryKey(), // UUID
+  userId: int("userId").notNull(), // 关联用户
+  appId: varchar("appId", { length: 255 }).notNull(), // 飞书应用 ID
+  appSecret: text("appSecret").notNull(), // 飞书应用密钥（加密存储）
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FeishuConfig = typeof feishuConfigs.$inferSelect;
+export type InsertFeishuConfig = typeof feishuConfigs.$inferInsert;

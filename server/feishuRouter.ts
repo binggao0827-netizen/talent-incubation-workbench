@@ -3,9 +3,68 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { parseDocument } from "./documentParser";
+import { nanoid } from "nanoid";
+import { feishuConfigs } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 function isAdmin(userRole?: string): boolean {
   return userRole === "admin";
+}
+
+// Helper function to get Feishu access token
+async function getFeishuAccessToken(appId: string, appSecret: string): Promise<string> {
+  try {
+    const response = await fetch("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        app_id: appId,
+        app_secret: appSecret,
+      }),
+    });
+
+    const data = await response.json() as any;
+    if (data.code !== 0) {
+      throw new Error(`Failed to get access token: ${data.msg}`);
+    }
+    return data.tenant_access_token;
+  } catch (error) {
+    throw new Error(`Feishu API error: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
+}
+
+// Helper function to get document content from Feishu API
+async function getFeishuDocumentContent(docId: string, accessToken: string): Promise<string> {
+  try {
+    // Try to get document as markdown
+    const url = `https://open.feishu.cn/open-apis/doc/v2/${docId}/raw_content`;
+    console.log(`Fetching from Feishu API: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+      },
+    });
+
+    console.log(`Feishu API response status: ${response.status}`);
+
+    const data = await response.json() as any;
+    console.log(`Feishu API response:`, JSON.stringify(data).substring(0, 500));
+    
+    if (data.code !== 0) {
+      throw new Error(`Feishu API error: ${data.msg || data.code}`);
+    }
+
+    // The content is returned as markdown
+    const content = data.data?.content || "";
+    console.log(`Document content length: ${content.length}`);
+    return content;
+  } catch (error) {
+    console.error(`getFeishuDocumentContent error:`, error);
+    throw new Error(`Failed to get document content: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
 }
 
 export const feishuRouter = router({
@@ -14,8 +73,31 @@ export const feishuRouter = router({
     if (!isAdmin(ctx.user?.role)) {
       throw new TRPCError({ code: "FORBIDDEN" });
     }
-    // TODO: Get from database (feishu_config table)
-    return null;
+    
+    try {
+      const database = await db.getDb();
+      if (!database) {
+        return null;
+      }
+
+      const config = await database
+        .select()
+        .from(feishuConfigs)
+        .where(eq(feishuConfigs.userId, ctx.user.id))
+        .limit(1);
+
+      if (config.length === 0) {
+        return null;
+      }
+
+      // Don't return the secret
+      return {
+        appId: config[0].appId,
+      };
+    } catch (error) {
+      console.error("Failed to get Feishu config:", error);
+      return null;
+    }
   }),
 
   // Save Feishu configuration
@@ -28,8 +110,51 @@ export const feishuRouter = router({
       if (!isAdmin(ctx.user?.role)) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
-      // TODO: Save to database (feishu_config table)
-      return { success: true };
+
+      try {
+        const database = await db.getDb();
+        if (!database) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Database not available",
+          });
+        }
+
+        // Check if config already exists
+        const existing = await database
+          .select()
+          .from(feishuConfigs)
+          .where(eq(feishuConfigs.userId, ctx.user.id))
+          .limit(1);
+
+        if (existing.length > 0) {
+          // Update existing config
+          await database
+            .update(feishuConfigs)
+            .set({
+              appId: input.appId,
+              appSecret: input.appSecret,
+              updatedAt: new Date(),
+            })
+            .where(eq(feishuConfigs.userId, ctx.user.id));
+        } else {
+          // Create new config
+          await database.insert(feishuConfigs).values({
+            id: nanoid(36),
+            userId: ctx.user.id,
+            appId: input.appId,
+            appSecret: input.appSecret,
+          });
+        }
+
+        return { success: true };
+      } catch (error) {
+        console.error("Failed to save Feishu config:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to save configuration",
+        });
+      }
     }),
 
   // Test Feishu connection
@@ -42,8 +167,16 @@ export const feishuRouter = router({
       if (!isAdmin(ctx.user?.role)) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
-      // TODO: Call Feishu API to test connection
-      return { success: true, message: "连接成功" };
+
+      try {
+        await getFeishuAccessToken(input.appId, input.appSecret);
+        return { success: true, message: "连接成功" };
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Connection failed",
+        });
+      }
     }),
 
   // Parse document from Feishu link - returns document content for further parsing
@@ -55,30 +188,44 @@ export const feishuRouter = router({
       if (!ctx.user) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
+
       try {
+        // Get Feishu config from database
+        const database = await db.getDb();
+        if (!database) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Database not available",
+          });
+        }
+
+        const config = await database
+          .select()
+          .from(feishuConfigs)
+          .where(eq(feishuConfigs.userId, ctx.user.id))
+          .limit(1);
+
+        if (config.length === 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Feishu configuration not found. Please configure Feishu API first.",
+          });
+        }
+
         // Extract document ID from Feishu URL
-        // Feishu URLs can be in multiple formats:
-        // - https://xxx.feishu.cn/docs/doccn...
-        // - https://xxx.feishu.cn/wiki/VTWewebNUit3wfkUMZqcPgXPnyh
-        // - https://xxx.feishu.cn/base/appXXX
-        
-        // Try to match docs format first
         let urlMatch = input.documentUrl.match(/docs\/([a-zA-Z0-9]+)/);
         let docId = urlMatch?.[1];
-        
-        // If not docs format, try wiki format
+
         if (!docId) {
           urlMatch = input.documentUrl.match(/wiki\/([a-zA-Z0-9]+)/);
           docId = urlMatch?.[1];
         }
-        
-        // If still no match, try base format
+
         if (!docId) {
           urlMatch = input.documentUrl.match(/base\/([a-zA-Z0-9]+)/);
           docId = urlMatch?.[1];
         }
-        
-        // If still no match, try to extract from pathname
+
         if (!docId) {
           const urlObj = new URL(input.documentUrl);
           const pathSegments = urlObj.pathname.split("/").filter(s => s);
@@ -86,7 +233,7 @@ export const feishuRouter = router({
             docId = pathSegments[pathSegments.length - 1];
           }
         }
-        
+
         if (!docId) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -95,28 +242,29 @@ export const feishuRouter = router({
         }
 
         console.log(`Fetching Feishu document: ${docId} from URL: ${input.documentUrl}`);
-        
-        // For now, return placeholder document content
-        // In production, this would call the Feishu API to fetch document content
-        // TODO: Implement actual Feishu API integration
-        // This would require:
-        // 1. Get Feishu app credentials from database
-        // 2. Call Feishu API to fetch document content (as markdown or html)
-        // 3. Return the raw content for batchImportScripts to parse
-        
-        // Placeholder content with proper format for parseDocument
-        // Format: 选题一：《标题》 followed by content
-        const placeholderContent = `选题一：《从飞书导入的脚本示例》
-这是从飞书文档导入的脚本内容。您可以在这里添加脚本的详细描述。
 
-选题二：《另一个脚本例子》
-这是第二个脚本的示例内容。可以包含多行文本和格式化内容。`;
-        
-        return { 
-          content: Buffer.from(placeholderContent).toString('base64') // Return as base64 like local upload
+        // Get access token
+        const accessToken = await getFeishuAccessToken(config[0].appId, config[0].appSecret);
+
+        // Get document content
+        const content = await getFeishuDocumentContent(docId, accessToken);
+
+        if (!content) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Document is empty or cannot be accessed",
+          });
+        }
+
+        // Return as base64 like local upload
+        return {
+          content: Buffer.from(content).toString('base64')
         };
       } catch (error) {
         console.error("Feishu document parsing error:", error);
+        if (error instanceof TRPCError) {
+          throw error;
+        }
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error ? error.message : "Failed to parse Feishu document",
@@ -191,7 +339,7 @@ export const feishuRouter = router({
               console.warn(`Skipping script ${script.scriptId}: accountId is required`);
               continue;
             }
-            
+
             const created = await db.createScript({
               title: script.title,
               content: script.content,
