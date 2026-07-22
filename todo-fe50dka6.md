@@ -120,3 +120,47 @@
 - [x] 添加热榜导航项到侧边栏
 - [ ] 添加排序、筛选、搜索功能
 - [ ] 测试和优化
+
+
+## 定时采集任务实现
+
+### 第九阶段：创建定时采集任务
+- [x] 创建定时任务处理器 (collectTrendingHandler.ts)
+- [x] 在 server/_core/index.ts 中注册处理器
+- [ ] 通过 CLI 创建定时任务（需要部署后执行）
+- [ ] 验证定时任务正常运行
+
+### 已完成的定时任务工作
+
+**后端实现：**
+1. 创建了 `collectTrendingHandler.ts`：
+   - 验证请求来自定时任务系统
+   - 支持采集所有平台的数据
+   - 包含完整的错误处理和日志记录
+   - 返回详细的采集结果
+
+2. 注册了处理器到 `/api/scheduled/collectTrending`
+
+**定时任务配置（待执行）：**
+- 建议配置：每天 UTC 时间 00:00、06:00、12:00、18:00 各采集一次（每 6 小时）
+- 或者：每小时采集一次（`0 0 * * * *`）
+- 或者：每天早上 9:00 UTC 采集一次（`0 0 9 * * *`）
+
+**部署后的下一步：**
+用户需要在项目部署后，运行以下命令创建定时任务：
+```bash
+manus-heartbeat create \
+  --name trending-collection-6h \
+  --cron "0 0 */6 * * *" \
+  --path /api/scheduled/collectTrending \
+  --description "Collect trending data every 6 hours"
+```
+
+或者每小时采集一次：
+```bash
+manus-heartbeat create \
+  --name trending-collection-hourly \
+  --cron "0 0 * * * *" \
+  --path /api/scheduled/collectTrending \
+  --description "Collect trending data hourly"
+```
