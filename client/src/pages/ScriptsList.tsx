@@ -12,7 +12,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { useState, useRef } from "react";
-import { Plus, FileText, Upload, AlertCircle, CheckCircle } from "lucide-react";
+import { Plus, FileText, Upload, AlertCircle, CheckCircle, ChevronDown, ChevronUp, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -48,6 +48,15 @@ interface ParsedScript {
   contentType?: string;
 }
 
+interface EditingScriptState {
+  scriptId: string;
+  title: string;
+  content: string;
+  topicTag: string;
+  hookType: string;
+  status: string;
+}
+
 export default function ScriptsList() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
@@ -58,6 +67,11 @@ export default function ScriptsList() {
     status: "",
     search: "",
   });
+  
+  // Quick edit state
+  const [expandedScriptId, setExpandedScriptId] = useState<string | null>(null);
+  const [editingScript, setEditingScript] = useState<EditingScriptState | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   
   // Local upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -83,6 +97,7 @@ export default function ScriptsList() {
 
   const { data: accounts } = trpc.accounts.list.useQuery({});
   const createMutation = trpc.scripts.create.useMutation();
+  const updateMutation = trpc.scripts.update.useMutation();
   const batchImportMutation = trpc.feishu.batchImportScripts.useMutation();
 
   const form = useForm<ScriptFormValues>({
@@ -173,6 +188,63 @@ export default function ScriptsList() {
       toast.error("读取文件失败");
       setIsImporting(false);
     }
+  };
+
+  // Handle quick edit - expand/collapse
+  const handleToggleEdit = (script: any) => {
+    if (expandedScriptId === script.id) {
+      setExpandedScriptId(null);
+      setEditingScript(null);
+    } else {
+      setExpandedScriptId(script.id);
+      setEditingScript({
+        scriptId: script.id,
+        title: script.title,
+        content: script.content,
+        topicTag: script.topicTag || "其他",
+        hookType: script.hookType || "其他",
+        status: script.status || "草稿",
+      });
+    }
+  };
+
+  // Handle save edit
+  const handleSaveEdit = async () => {
+    if (!editingScript) return;
+
+    if (!editingScript.title.trim() || !editingScript.content.trim()) {
+      toast.error("标题和内容不能为空");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      await updateMutation.mutateAsync({
+        id: editingScript.scriptId,
+        data: {
+          title: editingScript.title,
+          content: editingScript.content,
+          topicTag: editingScript.topicTag as any,
+          hookType: editingScript.hookType as any,
+          status: editingScript.status as any,
+        },
+      });
+      toast.success("脚本已保存");
+      setExpandedScriptId(null);
+      setEditingScript(null);
+      refetch();
+    } catch (error) {
+      console.error("Save error:", error);
+      toast.error("保存失败，请重试");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setExpandedScriptId(null);
+    setEditingScript(null);
   };
 
   const onSubmit = async (data: ScriptFormValues) => {
@@ -461,15 +533,24 @@ export default function ScriptsList() {
               <Spinner />
             </div>
           ) : scripts && scripts.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {scripts.map((script) => (
-                <Card key={script.id} className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => navigate(`/scripts/${script.id}`)}
-                >
-                  <CardContent className="pt-6">
+                <div key={script.id} className="border border-border rounded-lg overflow-hidden">
+                  {/* Script Card Header */}
+                  <div
+                    className="p-4 bg-card hover:bg-accent/5 transition-colors cursor-pointer"
+                    onClick={() => handleToggleEdit(script)}
+                  >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-base">{script.title}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium text-base">{script.title}</h3>
+                          {expandedScriptId === script.id ? (
+                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{script.content}</p>
                         <div className="flex items-center gap-2 mt-3 flex-wrap">
                           {script.topicTag && <Tag>{script.topicTag}</Tag>}
@@ -478,11 +559,149 @@ export default function ScriptsList() {
                         </div>
                       </div>
                       <div className="text-right text-sm text-muted-foreground flex-shrink-0">
-                        <p className="text-xs mt-1">{new Date(script.createdAt).toLocaleDateString()}</p>
+                        <p className="text-xs">{new Date(script.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+
+                  {/* Quick Edit Panel */}
+                  {expandedScriptId === script.id && editingScript && (
+                    <div className="bg-accent/5 border-t border-border p-4 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-xs">标题</Label>
+                          <Input
+                            value={editingScript.title}
+                            onChange={(e) =>
+                              setEditingScript({
+                                ...editingScript,
+                                title: e.target.value,
+                              })
+                            }
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">状态</Label>
+                          <Select
+                            value={editingScript.status}
+                            onValueChange={(value) =>
+                              setEditingScript({
+                                ...editingScript,
+                                status: value,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="草稿">草稿</SelectItem>
+                              <SelectItem value="审核">审核</SelectItem>
+                              <SelectItem value="发布">发布</SelectItem>
+                              <SelectItem value="归档">归档</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-xs">内容类型</Label>
+                          <Select
+                            value={editingScript.topicTag}
+                            onValueChange={(value) =>
+                              setEditingScript({
+                                ...editingScript,
+                                topicTag: value,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="剧情">剧情</SelectItem>
+                              <SelectItem value="测评">测评</SelectItem>
+                              <SelectItem value="教程">教程</SelectItem>
+                              <SelectItem value="种草">种草</SelectItem>
+                              <SelectItem value="搞笑">搞笑</SelectItem>
+                              <SelectItem value="知识">知识</SelectItem>
+                              <SelectItem value="其他">其他</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">钩子类型</Label>
+                          <Select
+                            value={editingScript.hookType}
+                            onValueChange={(value) =>
+                              setEditingScript({
+                                ...editingScript,
+                                hookType: value,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="提问式">提问式</SelectItem>
+                              <SelectItem value="悬念式">悬念式</SelectItem>
+                              <SelectItem value="痛点式">痛点式</SelectItem>
+                              <SelectItem value="反转式">反转式</SelectItem>
+                              <SelectItem value="数据式">数据式</SelectItem>
+                              <SelectItem value="其他">其他</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs">脚本内容</Label>
+                        <Textarea
+                          value={editingScript.content}
+                          onChange={(e) =>
+                            setEditingScript({
+                              ...editingScript,
+                              content: e.target.value,
+                            })
+                          }
+                          className="mt-1 min-h-[120px]"
+                        />
+                      </div>
+
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCancelEdit}
+                          disabled={isSavingEdit}
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          取消
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveEdit}
+                          disabled={isSavingEdit}
+                        >
+                          {isSavingEdit ? (
+                            <>
+                              <Spinner className="w-4 h-4 mr-1" />
+                              保存中…
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-1" />
+                              保存
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           ) : (
