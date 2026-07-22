@@ -142,8 +142,8 @@ function DashboardLayoutContent({
               <span className="text-primary-foreground font-semibold text-xs" style={{display: 'none'}}>M</span>
             </div>
             <div className="flex flex-col">
-              <span className="font-semibold text-sm leading-tight tracking-tight">达人孵化工作台</span>
-              <span className="text-[10px] text-muted-foreground leading-tight" style={{fontSize: '16px'}}>美丽视线 Creator Hub</span>
+              <span className="font-semibold text-sm leading-tight tracking-tight">美丽视线 Creator Hub</span>
+              <span className="text-[10px] text-muted-foreground leading-tight" style={{fontSize: '10px'}}>达人孵化工作台</span>
             </div>
           </div>
         </SidebarHeader>
