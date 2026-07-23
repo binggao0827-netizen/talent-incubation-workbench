@@ -118,4 +118,39 @@ describe("batch import functionality", () => {
     expect(scripts[0].content).toContain("- 产品介绍");
     expect(scripts[1].content).toContain("1. 第一个技巧");
   });
+
+  it("should not include markdown headers in script content", async () => {
+    const content = `# 5月脚本库
+## 选题一：《美容护肤的常见误区》
+这是一个关于美容护肤的脚本内容。
+- 误区一：过度清洁
+- 误区二：忽视防晒
+- 误区三：频繁更换产品
+## 选题二：《医美项目对比分析》
+医美项目的详细对比内容。
+1. 项目A的特点
+2. 项目B的优势
+3. 项目C的适用人群
+## 选题三：《皮肤问题解决方案》
+针对不同皮肤问题的解决方案。
+**重点内容：**
+- 敏感肌护理
+- 痘痘肌治疗
+- 衰老肌抗衰`;
+
+    const base64Content = Buffer.from(content).toString("base64");
+    const scripts = await parseDocument(base64Content, "md", "5月脚本库");
+
+    expect(scripts).toHaveLength(3);
+    
+    // Verify that script content does NOT contain trailing ## markers
+    expect(scripts[0].content).not.toContain("##");
+    expect(scripts[1].content).not.toContain("##");
+    expect(scripts[2].content).not.toContain("##");
+    
+    // Verify that content is preserved correctly
+    expect(scripts[0].content).toContain("- 误区一：过度清洁");
+    expect(scripts[1].content).toContain("1. 项目A的特点");
+    expect(scripts[2].content).toContain("- 敏感肌护理");
+  });
 });

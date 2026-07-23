@@ -230,7 +230,7 @@ export const feishuRouter = router({
         if (config.length === 0) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Feishu configuration not found. Please configure Feishu API first.",
+            message: "飞书配置未找到。请先在'飞书集成设置'页面配置飞书应用的 App ID 和 App Secret。",
           });
         }
 
@@ -259,7 +259,7 @@ export const feishuRouter = router({
         if (!docId) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Invalid Feishu document URL format. Supported formats: docs, wiki, base",
+            message: "飞书文档链接格式不正确。请使用完整的飞书文档链接，例如：https://xxx.feishu.cn/docs/doccn...",
           });
         }
 

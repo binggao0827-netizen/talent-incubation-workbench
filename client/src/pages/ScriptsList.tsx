@@ -266,7 +266,20 @@ export default function ScriptsList() {
       }
     } catch (error) {
       console.error("Feishu import error:", error);
-      toast.error("导入失败，请检查链接是否有效或文档格式");
+      
+      // Extract error message from tRPC error
+      let errorMessage = "导入失败，请检查链接是否有效或文档格式";
+      if (error instanceof Error) {
+        const errorStr = error.message;
+        if (errorStr.includes("飞书配置未找到")) {
+          errorMessage = "飞书配置未找到。请先在'飞书集成设置'页面配置飞书应用的 App ID 和 App Secret。";
+        } else if (errorStr.includes("飞书文档链接格式不正确")) {
+          errorMessage = "飞书文档链接格式不正确。请使用完整的飞书文档链接。";
+        } else if (errorStr.includes("无法获取飞书文档内容")) {
+          errorMessage = "无法获取飞书文档内容。请检查链接是否有效或飞书凭证是否正确。";
+        }
+      }
+      toast.error(errorMessage);
     } finally {
       setIsImporting(false);
     }
@@ -702,9 +715,14 @@ export default function ScriptsList() {
                   {/* Info Message */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-blue-800">
-                      系统将自动解析飞书文档中的所有脚本并直接导入。请确保飞书链接有效且您有访问权限。
-                    </p>
+                    <div className="text-xs text-blue-800 space-y-1">
+                      <p>
+                        系统将自动解析飞书文档中的所有脚本并直接导入。
+                      </p>
+                      <p>
+                        <strong>提示：</strong>如果导入失败，请先在「飞书集成设置」页面配置飞书应用的 App ID 和 App Secret。
+                      </p>
+                    </div>
                   </div>
                 </div>
               </TabsContent>

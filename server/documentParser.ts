@@ -61,12 +61,18 @@ function extractScripts(content: string, monthPrefix: string): ParsedScript[] {
       .map(line => line.trimEnd()) // Remove trailing spaces but keep leading
       .join('\n')
       .replace(/^\n+/, '') // Remove leading empty lines
-      .replace(/\n+$/, ''); // Remove trailing empty lines
+      .replace(/\n+$/, '') // Remove trailing empty lines
+      .replace(/\n##\s*$/, ''); // Remove trailing markdown headers (##, ###, etc.)
+    
+    // If content is empty, add placeholder
+    if (!scriptContent) {
+      scriptContent = "（内容待补充）";
+    }
 
     scripts.push({
       scriptId: `${monthPrefix}-${String(scriptIndex).padStart(2, "0")}`,
       title,
-      content: scriptContent || "（内容待补充）",
+      content: scriptContent,
     });
 
     scriptIndex++;
